@@ -26,6 +26,9 @@ Thumbs.db
 # LibreOffice lock files
 .~lock.*
 
+# development-only uploaded company media
+/public/dev-uploads/
+
 # TypeScript
 *.tsbuildinfo
 next-env.d.ts

@@ -1,6 +1,6 @@
 import { sql } from "drizzle-orm";
 import { db, endDatabaseConnection } from "@/db";
-import { industries } from "@/db/schema";
+import { benefits, industries } from "@/db/schema";
 
 const industrySeed = [
   ["نرم‌افزار و فناوری اطلاعات", "software-it"],
@@ -37,6 +37,17 @@ const industrySeed = [
   ["سازمان‌های مردم‌نهاد", "nonprofit"],
 ] as const;
 
+const benefitSeed = [
+  ["بیمه تکمیلی", "supplemental-insurance"],
+  ["ساعت کاری منعطف", "flexible-hours"],
+  ["امکان دورکاری", "remote-work"],
+  ["وعده غذایی", "meals"],
+  ["سرویس رفت‌وآمد", "transportation-service"],
+  ["پاداش", "bonuses"],
+  ["آموزش و توسعه", "learning-development"],
+  ["هدایای مناسبتی", "occasion-gifts"],
+] as const;
+
 async function seedIndustries() {
   await db
     .insert(industries)
@@ -46,7 +57,15 @@ async function seedIndustries() {
       set: { name: sql`excluded.name`, updatedAt: new Date() },
     });
 
-  console.log(`Seeded ${industrySeed.length} industries.`);
+  await db
+    .insert(benefits)
+    .values(benefitSeed.map(([name, slug]) => ({ name, slug })))
+    .onConflictDoUpdate({
+      target: benefits.slug,
+      set: { name: sql`excluded.name`, updatedAt: new Date() },
+    });
+
+  console.log(`Seeded ${industrySeed.length} industries and ${benefitSeed.length} benefits.`);
 }
 
 seedIndustries()

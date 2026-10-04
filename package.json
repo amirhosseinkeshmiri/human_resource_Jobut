@@ -9,6 +9,7 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test:auth": "NODE_OPTIONS=--conditions=react-server tsx --test src/auth/auth.test.ts",
+    "test:onboarding": "NODE_OPTIONS=--conditions=react-server tsx --test src/onboarding/validation.test.ts",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:seed": "tsx src/db/seed/industries.ts"
