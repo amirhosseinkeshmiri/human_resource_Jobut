@@ -1,27 +1,48 @@
+import "server-only";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import * as schema from "./schema";
 
-const databaseUrl = process.env.DATABASE_URL;
-
-if (!databaseUrl) {
-  throw new Error("DATABASE_URL is not configured");
-}
-
 const globalForDatabase = globalThis as unknown as {
-  jobutSql?: ReturnType<typeof postgres>;
+  jobutDatabaseConnection?: ReturnType<typeof createConnection>;
 };
 
-const sql =
-  globalForDatabase.jobutSql ??
-  postgres(databaseUrl, {
+function createConnection() {
+  const databaseUrl = process.env.DATABASE_URL;
+  if (!databaseUrl) throw new Error("DATABASE_URL is not configured");
+
+  const client = postgres(databaseUrl, {
     max: 10,
     prepare: false,
   });
 
-if (process.env.NODE_ENV !== "production") {
-  globalForDatabase.jobutSql = sql;
+  return {
+    client,
+    database: drizzle(client, { schema }),
+  };
 }
 
-export const db = drizzle(sql, { schema });
-export { sql as sqlClient };
+function getConnection() {
+  if (!globalForDatabase.jobutDatabaseConnection) {
+    globalForDatabase.jobutDatabaseConnection = createConnection();
+  }
+
+  return globalForDatabase.jobutDatabaseConnection;
+}
+
+type Database = ReturnType<typeof createConnection>["database"];
+
+export const db = new Proxy({} as Database, {
+  get(_target, property) {
+    const database = getConnection().database;
+    const value = Reflect.get(database, property);
+    return typeof value === "function" ? value.bind(database) : value;
+  },
+});
+
+export async function endDatabaseConnection() {
+  if (globalForDatabase.jobutDatabaseConnection) {
+    await globalForDatabase.jobutDatabaseConnection.client.end();
+    globalForDatabase.jobutDatabaseConnection = undefined;
+  }
+}

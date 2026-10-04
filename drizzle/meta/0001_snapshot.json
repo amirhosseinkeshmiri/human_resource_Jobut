@@ -1,0 +1,1060 @@
+{
+  "id": "cf4980f4-268a-4e85-810f-0f18bcf41481",
+  "prevId": "b9c0e984-a738-435e-8df6-328f3de2a19d",
+  "version": "7",
+  "dialect": "postgresql",
+  "tables": {
+    "public.benefits": {
+      "name": "benefits",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "name": {
+          "name": "name",
+          "type": "varchar(120)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "slug": {
+          "name": "slug",
+          "type": "varchar(120)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "benefits_name_unique": {
+          "name": "benefits_name_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "name"
+          ]
+        },
+        "benefits_slug_unique": {
+          "name": "benefits_slug_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "slug"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.companies": {
+      "name": "companies",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "employer_account_id": {
+          "name": "employer_account_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "industry_id": {
+          "name": "industry_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "varchar(200)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "address": {
+          "name": "address",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "founding_year": {
+          "name": "founding_year",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "logo_url": {
+          "name": "logo_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "companies_industry_id_idx": {
+          "name": "companies_industry_id_idx",
+          "columns": [
+            {
+              "expression": "industry_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "companies_employer_account_id_employer_accounts_id_fk": {
+          "name": "companies_employer_account_id_employer_accounts_id_fk",
+          "tableFrom": "companies",
+          "tableTo": "employer_accounts",
+          "columnsFrom": [
+            "employer_account_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "companies_industry_id_industries_id_fk": {
+          "name": "companies_industry_id_industries_id_fk",
+          "tableFrom": "companies",
+          "tableTo": "industries",
+          "columnsFrom": [
+            "industry_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "companies_employer_account_unique": {
+          "name": "companies_employer_account_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "employer_account_id"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "companies_founding_year_check": {
+          "name": "companies_founding_year_check",
+          "value": "\"companies\".\"founding_year\" is null or \"companies\".\"founding_year\" between 1000 and 9999"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.company_benefits": {
+      "name": "company_benefits",
+      "schema": "",
+      "columns": {
+        "company_id": {
+          "name": "company_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "benefit_id": {
+          "name": "benefit_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "company_benefits_company_id_companies_id_fk": {
+          "name": "company_benefits_company_id_companies_id_fk",
+          "tableFrom": "company_benefits",
+          "tableTo": "companies",
+          "columnsFrom": [
+            "company_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "company_benefits_benefit_id_benefits_id_fk": {
+          "name": "company_benefits_benefit_id_benefits_id_fk",
+          "tableFrom": "company_benefits",
+          "tableTo": "benefits",
+          "columnsFrom": [
+            "benefit_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "company_benefits_company_id_benefit_id_pk": {
+          "name": "company_benefits_company_id_benefit_id_pk",
+          "columns": [
+            "company_id",
+            "benefit_id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.company_images": {
+      "name": "company_images",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "company_id": {
+          "name": "company_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "image_url": {
+          "name": "image_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "sort_order": {
+          "name": "sort_order",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "company_images_company_id_idx": {
+          "name": "company_images_company_id_idx",
+          "columns": [
+            {
+              "expression": "company_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "company_images_company_id_companies_id_fk": {
+          "name": "company_images_company_id_companies_id_fk",
+          "tableFrom": "company_images",
+          "tableTo": "companies",
+          "columnsFrom": [
+            "company_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "company_images_company_sort_unique": {
+          "name": "company_images_company_sort_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "company_id",
+            "sort_order"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "company_images_sort_order_check": {
+          "name": "company_images_sort_order_check",
+          "value": "\"company_images\".\"sort_order\" >= 0"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.company_job_credit_transactions": {
+      "name": "company_job_credit_transactions",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "company_id": {
+          "name": "company_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "package_purchase_id": {
+          "name": "package_purchase_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "amount": {
+          "name": "amount",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "credit_transactions_company_id_idx": {
+          "name": "credit_transactions_company_id_idx",
+          "columns": [
+            {
+              "expression": "company_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "company_job_credit_transactions_company_id_companies_id_fk": {
+          "name": "company_job_credit_transactions_company_id_companies_id_fk",
+          "tableFrom": "company_job_credit_transactions",
+          "tableTo": "companies",
+          "columnsFrom": [
+            "company_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "company_job_credit_transactions_package_purchase_id_package_purchases_id_fk": {
+          "name": "company_job_credit_transactions_package_purchase_id_package_purchases_id_fk",
+          "tableFrom": "company_job_credit_transactions",
+          "tableTo": "package_purchases",
+          "columnsFrom": [
+            "package_purchase_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "credit_transactions_purchase_unique": {
+          "name": "credit_transactions_purchase_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "package_purchase_id"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "credit_transactions_amount_check": {
+          "name": "credit_transactions_amount_check",
+          "value": "\"company_job_credit_transactions\".\"amount\" <> 0"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.employer_accounts": {
+      "name": "employer_accounts",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "email": {
+          "name": "email",
+          "type": "varchar(320)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "mobile": {
+          "name": "mobile",
+          "type": "varchar(20)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "employer_accounts_email_unique": {
+          "name": "employer_accounts_email_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "email"
+          ]
+        },
+        "employer_accounts_mobile_unique": {
+          "name": "employer_accounts_mobile_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "mobile"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "employer_accounts_contact_check": {
+          "name": "employer_accounts_contact_check",
+          "value": "\"employer_accounts\".\"email\" is not null or \"employer_accounts\".\"mobile\" is not null"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.employer_auth_challenges": {
+      "name": "employer_auth_challenges",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "identifier": {
+          "name": "identifier",
+          "type": "varchar(320)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "identifier_type": {
+          "name": "identifier_type",
+          "type": "employer_identifier_type",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "code_digest": {
+          "name": "code_digest",
+          "type": "varchar(64)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "expires_at": {
+          "name": "expires_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "consumed_at": {
+          "name": "consumed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "attempts": {
+          "name": "attempts",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "employer_auth_challenges_identifier_idx": {
+          "name": "employer_auth_challenges_identifier_idx",
+          "columns": [
+            {
+              "expression": "identifier",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "employer_auth_challenges_attempts_check": {
+          "name": "employer_auth_challenges_attempts_check",
+          "value": "\"employer_auth_challenges\".\"attempts\" between 0 and 5"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.employer_sessions": {
+      "name": "employer_sessions",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "employer_account_id": {
+          "name": "employer_account_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "token_digest": {
+          "name": "token_digest",
+          "type": "varchar(64)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "expires_at": {
+          "name": "expires_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "employer_sessions_account_id_idx": {
+          "name": "employer_sessions_account_id_idx",
+          "columns": [
+            {
+              "expression": "employer_account_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "employer_sessions_employer_account_id_employer_accounts_id_fk": {
+          "name": "employer_sessions_employer_account_id_employer_accounts_id_fk",
+          "tableFrom": "employer_sessions",
+          "tableTo": "employer_accounts",
+          "columnsFrom": [
+            "employer_account_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "employer_sessions_token_digest_unique": {
+          "name": "employer_sessions_token_digest_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "token_digest"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.industries": {
+      "name": "industries",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "name": {
+          "name": "name",
+          "type": "varchar(120)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "slug": {
+          "name": "slug",
+          "type": "varchar(120)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "industries_name_unique": {
+          "name": "industries_name_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "name"
+          ]
+        },
+        "industries_slug_unique": {
+          "name": "industries_slug_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "slug"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.job_packages": {
+      "name": "job_packages",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "name": {
+          "name": "name",
+          "type": "varchar(120)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "job_credits": {
+          "name": "job_credits",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "price_toman": {
+          "name": "price_toman",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "is_active": {
+          "name": "is_active",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "job_packages_credits_check": {
+          "name": "job_packages_credits_check",
+          "value": "\"job_packages\".\"job_credits\" > 0"
+        },
+        "job_packages_price_check": {
+          "name": "job_packages_price_check",
+          "value": "\"job_packages\".\"price_toman\" >= 0"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.job_posts": {
+      "name": "job_posts",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "company_id": {
+          "name": "company_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "title": {
+          "name": "title",
+          "type": "varchar(200)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "job_post_status",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'draft'"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "job_posts_company_id_idx": {
+          "name": "job_posts_company_id_idx",
+          "columns": [
+            {
+              "expression": "company_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "job_posts_company_id_companies_id_fk": {
+          "name": "job_posts_company_id_companies_id_fk",
+          "tableFrom": "job_posts",
+          "tableTo": "companies",
+          "columnsFrom": [
+            "company_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.package_purchases": {
+      "name": "package_purchases",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "company_id": {
+          "name": "company_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "job_package_id": {
+          "name": "job_package_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "package_name": {
+          "name": "package_name",
+          "type": "varchar(120)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "job_credits": {
+          "name": "job_credits",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "price_toman": {
+          "name": "price_toman",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "purchased_at": {
+          "name": "purchased_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "package_purchases_company_id_idx": {
+          "name": "package_purchases_company_id_idx",
+          "columns": [
+            {
+              "expression": "company_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "package_purchases_company_id_companies_id_fk": {
+          "name": "package_purchases_company_id_companies_id_fk",
+          "tableFrom": "package_purchases",
+          "tableTo": "companies",
+          "columnsFrom": [
+            "company_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        },
+        "package_purchases_job_package_id_job_packages_id_fk": {
+          "name": "package_purchases_job_package_id_job_packages_id_fk",
+          "tableFrom": "package_purchases",
+          "tableTo": "job_packages",
+          "columnsFrom": [
+            "job_package_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "restrict",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "package_purchases_credits_check": {
+          "name": "package_purchases_credits_check",
+          "value": "\"package_purchases\".\"job_credits\" > 0"
+        },
+        "package_purchases_price_check": {
+          "name": "package_purchases_price_check",
+          "value": "\"package_purchases\".\"price_toman\" >= 0"
+        }
+      },
+      "isRLSEnabled": false
+    }
+  },
+  "enums": {
+    "public.employer_identifier_type": {
+      "name": "employer_identifier_type",
+      "schema": "public",
+      "values": [
+        "email",
+        "mobile"
+      ]
+    },
+    "public.job_post_status": {
+      "name": "job_post_status",
+      "schema": "public",
+      "values": [
+        "draft",
+        "published",
+        "closed"
+      ]
+    }
+  },
+  "schemas": {},
+  "sequences": {},
+  "roles": {},
+  "policies": {},
+  "views": {},
+  "_meta": {
+    "columns": {},
+    "schemas": {},
+    "tables": {}
+  }
+}

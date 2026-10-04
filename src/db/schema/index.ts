@@ -38,6 +38,43 @@ export const employerAccounts = pgTable(
   ],
 );
 
+export const employerIdentifierType = pgEnum("employer_identifier_type", ["email", "mobile"]);
+
+export const employerAuthChallenges = pgTable(
+  "employer_auth_challenges",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    identifier: varchar("identifier", { length: 320 }).notNull(),
+    identifierType: employerIdentifierType("identifier_type").notNull(),
+    codeDigest: varchar("code_digest", { length: 64 }).notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    consumedAt: timestamp("consumed_at", { withTimezone: true }),
+    attempts: integer("attempts").default(0).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("employer_auth_challenges_identifier_idx").on(table.identifier),
+    check(
+      "employer_auth_challenges_attempts_check",
+      sql`${table.attempts} between 0 and 5`,
+    ),
+  ],
+);
+
+export const employerSessions = pgTable(
+  "employer_sessions",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    employerAccountId: uuid("employer_account_id")
+      .notNull()
+      .references(() => employerAccounts.id, { onDelete: "cascade" }),
+    tokenDigest: varchar("token_digest", { length: 64 }).notNull().unique(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [index("employer_sessions_account_id_idx").on(table.employerAccountId)],
+);
+
 export const industries = pgTable("industries", {
   id: uuid("id").defaultRandom().primaryKey(),
   name: varchar("name", { length: 120 }).notNull().unique(),
@@ -185,8 +222,16 @@ export const jobPosts = pgTable(
   (table) => [index("job_posts_company_id_idx").on(table.companyId)],
 );
 
-export const employerAccountRelations = relations(employerAccounts, ({ one }) => ({
+export const employerAccountRelations = relations(employerAccounts, ({ one, many }) => ({
   company: one(companies),
+  sessions: many(employerSessions),
+}));
+
+export const employerSessionRelations = relations(employerSessions, ({ one }) => ({
+  employerAccount: one(employerAccounts, {
+    fields: [employerSessions.employerAccountId],
+    references: [employerAccounts.id],
+  }),
 }));
 
 export const industryRelations = relations(industries, ({ many }) => ({

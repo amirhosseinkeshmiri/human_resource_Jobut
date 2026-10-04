@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { db, sqlClient } from "@/db";
+import { db, endDatabaseConnection } from "@/db";
 import { industries } from "@/db/schema";
 
 const industrySeed = [
@@ -55,5 +55,5 @@ seedIndustries()
     process.exitCode = 1;
   })
   .finally(async () => {
-    await sqlClient.end();
+    await endDatabaseConnection();
   });

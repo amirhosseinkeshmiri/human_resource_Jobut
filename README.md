@@ -11,7 +11,13 @@ cp .env.example .env.local
 npm run dev
 ```
 
-`DATABASE_URL` must contain a PostgreSQL connection string.
+`DATABASE_URL` must contain a PostgreSQL connection string. `AUTH_SECRET` must
+be a private random value of at least 32 characters and must be identical across
+all application instances.
+
+Verification-code delivery is intentionally unavailable in production until an
+email/SMS provider is selected. In local development only, the generated code is
+shown in the login UI so the flow can be exercised without a delivery provider.
 
 ```bash
 npm run db:generate  # generate SQL migrations from the schema
