@@ -1,0 +1,146 @@
+@import "tailwindcss";
+
+@theme inline {
+  --color-page: var(--page-background);
+  --color-surface: var(--surface);
+  --color-surface-elevated: var(--surface-elevated);
+  --color-text-primary: var(--text-primary);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-muted: var(--text-muted);
+  --color-ui-border: var(--border);
+  --color-action: var(--action-primary);
+  --color-action-hover: var(--action-primary-hover);
+  --color-danger: var(--destructive);
+  --color-danger-hover: var(--destructive-hover);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-focus: var(--focus-ring);
+
+  --font-sans: var(--font-ui);
+}
+
+:root {
+  --page-background: #f7f8f8;
+  --surface: #ffffff;
+  --surface-elevated: #fbfcfc;
+  --text-primary: #17211d;
+  --text-secondary: #47534e;
+  --text-muted: #6d7773;
+  --border: #dce2df;
+  --action-primary: #176b4b;
+  --action-primary-hover: #12583d;
+  --destructive: #b42318;
+  --destructive-hover: #912018;
+  --success: #18794e;
+  --warning: #9a6700;
+  --focus-ring: #25855f;
+
+  --font-ui: Tahoma, Arial, "Segoe UI", sans-serif;
+  --layout-content: 72rem;
+  --layout-dashboard: 90rem;
+  --page-padding: 1rem;
+  --section-spacing: 3rem;
+  --card-padding: 1.25rem;
+  --form-spacing: 1.5rem;
+  --field-spacing: 0.5rem;
+}
+
+@media (min-width: 40rem) {
+  :root {
+    --page-padding: 1.5rem;
+    --section-spacing: 4rem;
+    --card-padding: 1.5rem;
+  }
+}
+
+@media (min-width: 64rem) {
+  :root {
+    --page-padding: 2rem;
+    --section-spacing: 5rem;
+  }
+}
+
+@layer base {
+  *,
+  ::before,
+  ::after {
+    border-color: var(--border);
+  }
+
+  html {
+    min-width: 20rem;
+    background: var(--page-background);
+  }
+
+  body {
+    min-height: 100vh;
+    background: var(--page-background);
+    color: var(--text-primary);
+    font-family: var(--font-ui);
+    text-align: start;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  button,
+  input,
+  select,
+  textarea {
+    font: inherit;
+  }
+
+  ::placeholder {
+    color: var(--text-muted);
+    opacity: 1;
+  }
+}
+
+@layer components {
+  .text-page-title {
+    font-size: clamp(1.75rem, 3vw, 2.25rem);
+    font-weight: 700;
+    line-height: 1.35;
+    letter-spacing: -0.02em;
+  }
+
+  .text-section-title {
+    font-size: 1.5rem;
+    font-weight: 700;
+    line-height: 1.4;
+  }
+
+  .text-card-title {
+    font-size: 1.125rem;
+    font-weight: 700;
+    line-height: 1.5;
+  }
+
+  .text-body {
+    font-size: 1rem;
+    line-height: 1.75;
+  }
+
+  .text-secondary {
+    color: var(--text-secondary);
+    font-size: 0.9375rem;
+    line-height: 1.7;
+  }
+
+  .text-helper {
+    color: var(--text-muted);
+    font-size: 0.8125rem;
+    line-height: 1.6;
+  }
+
+  .text-label {
+    font-size: 0.875rem;
+    font-weight: 600;
+    line-height: 1.6;
+  }
+
+  .text-meta {
+    color: var(--text-muted);
+    font-size: 0.75rem;
+    line-height: 1.5;
+  }
+}

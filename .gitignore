@@ -1,0 +1,31 @@
+# dependencies
+/node_modules
+
+# Next.js and build output
+/.next
+/out
+/dist
+
+# environment files (the example is safe to commit)
+.env*
+!.env.example
+
+# logs
+*.log
+npm-debug.log*
+
+# OS and editor files
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+.idea/
+.vscode/
+
+# LibreOffice lock files
+.~lock.*
+
+# TypeScript
+*.tsbuildinfo
+next-env.d.ts
