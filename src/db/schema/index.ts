@@ -163,6 +163,8 @@ export const jobPackages = pgTable(
   ],
 );
 
+export const packagePurchaseStatus = pgEnum("package_purchase_status", ["pending", "paid"]);
+
 export const packagePurchases = pgTable(
   "package_purchases",
   {
@@ -176,7 +178,9 @@ export const packagePurchases = pgTable(
     packageName: varchar("package_name", { length: 120 }).notNull(),
     jobCredits: integer("job_credits").notNull(),
     priceToman: integer("price_toman").notNull(),
+    status: packagePurchaseStatus("status").default("pending").notNull(),
     purchasedAt: timestamp("purchased_at", { withTimezone: true }).defaultNow().notNull(),
+    paidAt: timestamp("paid_at", { withTimezone: true }),
     ...timestamps,
   },
   (table) => [
