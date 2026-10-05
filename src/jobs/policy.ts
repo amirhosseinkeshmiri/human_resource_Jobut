@@ -1,5 +1,6 @@
 export const JOB_TITLE_MAX_LENGTH = 200;
 export const ACTIVE_JOB_STATUS = "published" as const;
+export const JOB_PUBLISH_CREDIT_COST = 1;
 
 export type JobStatus = "draft" | "published" | "closed";
 
@@ -28,4 +29,20 @@ export function isJobOwnedByCompany(jobCompanyId: string, companyId: string) {
 
 export function canEditJob(status: JobStatus) {
   return status === "draft";
+}
+
+export type PublishEligibility = "publishable" | "not-found" | "not-draft";
+
+export function getPublishEligibility(
+  job: { companyId: string; status: JobStatus } | null,
+  authenticatedCompanyId: string,
+): PublishEligibility {
+  if (!job || job.companyId !== authenticatedCompanyId) return "not-found";
+  return job.status === "draft" ? "publishable" : "not-draft";
+}
+
+export function getPublishCreditDecision(balance: number) {
+  return balance >= JOB_PUBLISH_CREDIT_COST
+    ? { allowed: true, debitAmount: -JOB_PUBLISH_CREDIT_COST } as const
+    : { allowed: false, debitAmount: 0 } as const;
 }
