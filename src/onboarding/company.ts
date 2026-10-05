@@ -44,3 +44,19 @@ export async function getEmployerCompanyOnboarding(employerAccountId: string) {
 
   return { company, benefitIds, imageCount: gallery.count, complete };
 }
+
+export async function getEmployerDashboardCompany(employerAccountId: string) {
+  const [company] = await db
+    .select({
+      id: companies.id,
+      name: companies.name,
+      address: companies.address,
+      foundingYear: companies.foundingYear,
+      logoUrl: companies.logoUrl,
+    })
+    .from(companies)
+    .where(eq(companies.employerAccountId, employerAccountId))
+    .limit(1);
+
+  return company && isCompanyOnboardingComplete(company) ? company : null;
+}
