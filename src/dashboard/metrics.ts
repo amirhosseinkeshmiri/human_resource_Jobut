@@ -2,13 +2,14 @@ import "server-only";
 import { and, count, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { companyJobCreditTransactions, jobPosts } from "@/db/schema";
+import { ACTIVE_JOB_STATUS } from "@/jobs/policy";
 
 export async function getEmployerDashboardMetrics(companyId: string) {
   const [[activeJobs], remainingJobCredits] = await Promise.all([
     db
       .select({ value: count() })
       .from(jobPosts)
-      .where(and(eq(jobPosts.companyId, companyId), eq(jobPosts.status, "published"))),
+      .where(and(eq(jobPosts.companyId, companyId), eq(jobPosts.status, ACTIVE_JOB_STATUS))),
     getRemainingJobCredits(companyId),
   ]);
 
