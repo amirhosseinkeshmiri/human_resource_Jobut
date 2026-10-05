@@ -1,21 +1,16 @@
 import Image from "next/image";
-import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
 import { logoutEmployer } from "@/auth/actions";
-import { requireEmployer } from "@/auth/session";
 import { DashboardNav } from "@/components/dashboard/dashboard-nav";
 import { Button, Container } from "@/components/ui";
-import { getEmployerDashboardCompany } from "@/onboarding/company";
+import { getEmployerDashboardContext } from "@/dashboard/context";
 
 interface EmployerDashboardLayoutProps {
   children: ReactNode;
 }
 
 export default async function EmployerDashboardLayout({ children }: EmployerDashboardLayoutProps) {
-  const employer = await requireEmployer();
-  const company = await getEmployerDashboardCompany(employer.id);
-
-  if (!company) redirect("/employer/onboarding");
+  const { company } = await getEmployerDashboardContext();
   const developmentLogo =
     process.env.NODE_ENV !== "production" && company.logoUrl?.startsWith("/dev-uploads/")
       ? company.logoUrl

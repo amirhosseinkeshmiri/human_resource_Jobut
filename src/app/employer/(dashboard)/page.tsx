@@ -1,26 +1,16 @@
 import type { Metadata } from "next";
 import { DashboardStatCard } from "@/components/dashboard/dashboard-stat-card";
+import { getEmployerDashboardContext } from "@/dashboard/context";
+import { getEmployerDashboardMetrics } from "@/dashboard/metrics";
 
 export const metadata: Metadata = {
   title: "خانه کارفرما",
 };
 
-const statistics = [
-  {
-    label: "آگهی‌های فعال",
-    description: "آمار آگهی‌ها در مرحله مدیریت آگهی‌ها فعال می‌شود.",
-  },
-  {
-    label: "رزومه‌های جدید",
-    description: "این بخش تا زمان پیاده‌سازی دامنه کارجو و درخواست‌ها خالی می‌ماند.",
-  },
-  {
-    label: "آگهی‌های باقیمانده",
-    description: "اعتبار قابل استفاده در مرحله بسته‌ها و اعتبارها نمایش داده می‌شود.",
-  },
-];
+export default async function EmployerHomePage() {
+  const { company } = await getEmployerDashboardContext();
+  const metrics = await getEmployerDashboardMetrics(company.id);
 
-export default function EmployerHomePage() {
   return (
     <div>
       <div>
@@ -30,14 +20,21 @@ export default function EmployerHomePage() {
       </div>
 
       <section aria-label="شاخص‌های کلیدی" className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-        {statistics.map((statistic) => (
-          <DashboardStatCard
-            key={statistic.label}
-            label={statistic.label}
-            value="—"
-            description={statistic.description}
-          />
-        ))}
+        <DashboardStatCard
+          label="آگهی‌های فعال"
+          value={metrics.activeJobPosts.toLocaleString("fa-IR")}
+          description="تعداد آگهی‌های منتشرشده شرکت"
+        />
+        <DashboardStatCard
+          label="رزومه‌های جدید"
+          value="—"
+          description="پس از پیاده‌سازی دامنه کارجو و درخواست‌ها در دسترس خواهد بود."
+        />
+        <DashboardStatCard
+          label="آگهی‌های باقیمانده"
+          value={metrics.remainingJobCredits.toLocaleString("fa-IR")}
+          description="موجودی واقعی اعتبار ثبت آگهی شرکت"
+        />
       </section>
     </div>
   );
