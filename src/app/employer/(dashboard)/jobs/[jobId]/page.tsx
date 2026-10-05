@@ -1,12 +1,15 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Badge, Button, Card, FormField, Input, buttonClassNames } from "@/components/ui";
+import { Badge, Button, Card, buttonClassNames } from "@/components/ui";
+import { JobPostForm } from "@/components/jobs/job-post-form";
 import { getEmployerDashboardContext } from "@/dashboard/context";
 import { getRemainingJobCredits } from "@/dashboard/metrics";
 import { publishDraftJob, updateDraftJob } from "@/jobs/actions";
-import { JOB_TITLE_MAX_LENGTH, jobStatusLabels } from "@/jobs/policy";
+import { jobStatusLabels } from "@/jobs/policy";
 import { getCompanyJobPost } from "@/jobs/queries";
+import { sanitizeJobDescription } from "@/jobs/description";
+import { employmentTypeLabels, seniorityLevelLabels, workplaceTypeLabels } from "@/jobs/validation";
 
 export const metadata: Metadata = { title: "جزئیات آگهی" };
 
@@ -45,13 +48,15 @@ export default async function JobPage({ params, searchParams }: JobPageProps) {
   const publishState = typeof query.publish === "string" ? query.publish : undefined;
   const publishError = publishState === "insufficient"
     ? "اعتبار کافی برای انتشار آگهی ندارید."
+    : publishState === "incomplete"
+      ? "برای انتشار، ابتدا همه اطلاعات ضروری آگهی را کامل و ذخیره کنید."
     : publishState === "not-draft"
       ? "این آگهی دیگر قابل انتشار نیست."
       : publishState === "error"
         ? "انتشار آگهی انجام نشد. دوباره تلاش کنید."
         : null;
-  const errorMessage = error === "title"
-    ? "عنوان آگهی را به‌درستی وارد کنید."
+  const errorMessage = error === "validation"
+    ? "اطلاعات آگهی کامل یا معتبر نیست. موارد فرم را بررسی کنید."
     : error === "persistence" ? "ذخیره تغییرات انجام نشد. دوباره تلاش کنید." : undefined;
 
   return (
@@ -67,19 +72,28 @@ export default async function JobPage({ params, searchParams }: JobPageProps) {
       {publishError ? <p role="alert" className="mt-6 rounded-md border border-danger/30 bg-danger/5 p-3 text-sm text-danger">{publishError}</p> : null}
       <Card className="mt-8 shadow-none">
         {job.status === "draft" ? (
-          <form action={updateDraftJob.bind(null, job.id)} className="grid gap-6">
-            <FormField id="job-title" label="عنوان آگهی" required error={errorMessage}>
-              <Input name="title" defaultValue={job.title} maxLength={JOB_TITLE_MAX_LENGTH} autoComplete="off" required />
-            </FormField>
-            <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-              <Link href="/employer/jobs" className={buttonClassNames({ variant: "secondary" })}>بازگشت</Link>
-              <Button type="submit">ذخیره تغییرات</Button>
-            </div>
-          </form>
+          <JobPostForm
+            action={updateDraftJob.bind(null, job.id)}
+            submitLabel="ذخیره تغییرات"
+            serverError={errorMessage}
+            initialValues={{ ...job, description: sanitizeJobDescription(job.description) }}
+          />
         ) : (
-          <div>
-            <p className="text-secondary">در این مرحله، آگهی‌های منتشرشده یا بسته‌شده فقط قابل مشاهده‌اند.</p>
-            <p className="text-helper mt-3">آخرین به‌روزرسانی: {dateFormatter.format(job.updatedAt)}</p>
+          <div className="grid gap-6">
+            <p className="text-secondary">آگهی‌های منتشرشده یا بسته‌شده فقط قابل مشاهده‌اند.</p>
+            <dl className="grid gap-4 sm:grid-cols-2">
+              <div><dt className="text-meta">نوع حضور</dt><dd className="text-label mt-1">{job.workplaceType ? workplaceTypeLabels[job.workplaceType] : "—"}</dd></div>
+              <div><dt className="text-meta">نوع همکاری</dt><dd className="text-label mt-1">{job.employmentType ? employmentTypeLabels[job.employmentType] : "—"}</dd></div>
+              <div><dt className="text-meta">شهر</dt><dd className="text-label mt-1">{job.location || "—"}</dd></div>
+              <div><dt className="text-meta">سطح ارشدیت</dt><dd className="text-label mt-1">{job.seniorityLevel ? seniorityLevelLabels[job.seniorityLevel] : "—"}</dd></div>
+              <div className="sm:col-span-2"><dt className="text-meta">بازه حقوق</dt><dd className="text-label mt-1">{job.salaryNegotiable ? "حقوق توافقی" : job.salaryMin !== null && job.salaryMax !== null ? `${job.salaryMin.toLocaleString("fa-IR")} تا ${job.salaryMax.toLocaleString("fa-IR")} تومان` : "—"}</dd></div>
+              <div className="sm:col-span-2"><dt className="text-meta">مهارت‌های کلیدی</dt><dd className="mt-2 flex flex-wrap gap-2">{job.requiredSkills?.map((skill) => <Badge key={skill}>{skill}</Badge>) ?? "—"}</dd></div>
+            </dl>
+            <div>
+              <h2 className="text-label">توضیحات شغل</h2>
+              {job.description ? <div className="text-secondary mt-2 grid gap-3 [&_ol]:list-decimal [&_ol]:pe-6 [&_ul]:list-disc [&_ul]:pe-6" dangerouslySetInnerHTML={{ __html: sanitizeJobDescription(job.description) }} /> : <p className="text-secondary mt-2">—</p>}
+            </div>
+            <p className="text-helper">آخرین به‌روزرسانی: {dateFormatter.format(job.updatedAt)}</p>
             <Link href="/employer/jobs" className={buttonClassNames({ variant: "secondary", className: "mt-6" })}>بازگشت به آگهی‌ها</Link>
           </div>
         )}

@@ -21,6 +21,17 @@ export async function getCompanyJobPost(companyId: string, jobId: string) {
     status: jobPosts.status,
     createdAt: jobPosts.createdAt,
     updatedAt: jobPosts.updatedAt,
+    workplaceType: jobPosts.workplaceType,
+    employmentType: jobPosts.employmentType,
+    location: jobPosts.location,
+    seniorityLevel: jobPosts.seniorityLevel,
+    salaryMin: jobPosts.salaryMin,
+    salaryMax: jobPosts.salaryMax,
+    salaryNegotiable: jobPosts.salaryNegotiable,
+    requiredSkills: jobPosts.requiredSkills,
+    description: jobPosts.description,
+    publishedAt: jobPosts.publishedAt,
+    expiresAt: jobPosts.expiresAt,
   }).from(jobPosts).where(and(eq(jobPosts.id, jobId), eq(jobPosts.companyId, companyId))).limit(1);
   return job ?? null;
 }

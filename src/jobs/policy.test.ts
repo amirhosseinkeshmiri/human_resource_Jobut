@@ -7,9 +7,22 @@ import {
   getPublishCreditDecision,
   getPublishEligibility,
   isJobOwnedByCompany,
-  validateJobTitle,
   type JobStatus,
 } from "./policy";
+import type { JobPostFormValues } from "./validation";
+
+const completeValues: JobPostFormValues = {
+  title: "توسعه‌دهنده نرم‌افزار",
+  workplaceType: "hybrid",
+  employmentType: "full_time",
+  location: "تهران",
+  seniorityLevel: "senior",
+  salaryMin: 30_000_000,
+  salaryMax: 50_000_000,
+  salaryNegotiable: false,
+  requiredSkills: ["TypeScript"],
+  description: "<p>توسعه محصول</p>",
+};
 
 function applyPublicationPolicy(
   job: { companyId: string; status: JobStatus } | null,
@@ -36,13 +49,15 @@ function applyPublicationPolicy(
 }
 
 test("draft creation uses the authenticated company and defaults to draft", () => {
-  assert.deepEqual(createDraftJobValues("company-a", "توسعه‌دهنده نرم‌افزار"), {
-    companyId: "company-a", title: "توسعه‌دهنده نرم‌افزار", status: "draft",
+  assert.deepEqual(createDraftJobValues("company-a", completeValues), {
+    companyId: "company-a", ...completeValues, status: "draft",
   });
 });
 
 test("draft creation values contain no credit mutation", () => {
-  assert.deepEqual(Object.keys(createDraftJobValues("company-a", "برنامه‌نویس")).sort(), ["companyId", "status", "title"]);
+  const values = createDraftJobValues("company-a", completeValues);
+  assert.equal("credit" in values, false);
+  assert.equal("amount" in values, false);
 });
 
 test("ownership checks reject another company's job", () => {
@@ -54,11 +69,6 @@ test("only draft jobs are editable", () => {
   assert.equal(canEditJob("draft"), true);
   assert.equal(canEditJob("published"), false);
   assert.equal(canEditJob("closed"), false);
-});
-
-test("title validation trims input and rejects empty values", () => {
-  assert.deepEqual(validateJobTitle("  برنامه‌نویس  "), { ok: true, title: "برنامه‌نویس" });
-  assert.equal(validateJobTitle("   ").ok, false);
 });
 
 test("active-job semantics remain published-only", () => {

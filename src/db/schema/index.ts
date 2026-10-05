@@ -211,6 +211,20 @@ export const companyJobCreditTransactions = pgTable(
 );
 
 export const jobPostStatus = pgEnum("job_post_status", ["draft", "published", "closed"]);
+export const workplaceType = pgEnum("workplace_type", ["onsite", "remote", "hybrid"]);
+export const employmentType = pgEnum("employment_type", [
+  "full_time",
+  "part_time",
+  "project",
+  "internship",
+]);
+export const seniorityLevel = pgEnum("seniority_level", [
+  "intern",
+  "junior",
+  "mid_level",
+  "senior",
+  "lead",
+]);
 
 export const jobPosts = pgTable(
   "job_posts",
@@ -221,9 +235,26 @@ export const jobPosts = pgTable(
       .references(() => companies.id, { onDelete: "restrict" }),
     title: varchar("title", { length: 200 }).notNull(),
     status: jobPostStatus("status").default("draft").notNull(),
+    workplaceType: workplaceType("workplace_type"),
+    employmentType: employmentType("employment_type"),
+    location: varchar("location", { length: 160 }),
+    seniorityLevel: seniorityLevel("seniority_level"),
+    salaryMin: integer("salary_min"),
+    salaryMax: integer("salary_max"),
+    salaryNegotiable: boolean("salary_negotiable"),
+    requiredSkills: text("required_skills").array(),
+    description: text("description"),
+    publishedAt: timestamp("published_at", { withTimezone: true }),
+    expiresAt: timestamp("expires_at", { withTimezone: true }),
     ...timestamps,
   },
-  (table) => [index("job_posts_company_id_idx").on(table.companyId)],
+  (table) => [
+    index("job_posts_company_id_idx").on(table.companyId),
+    check(
+      "job_posts_salary_check",
+      sql`(${table.salaryMin} is null or ${table.salaryMin} >= 0) and (${table.salaryMax} is null or ${table.salaryMax} >= 0) and (${table.salaryMin} is null or ${table.salaryMax} is null or ${table.salaryMax} >= ${table.salaryMin})`,
+    ),
+  ],
 );
 
 export const employerAccountRelations = relations(employerAccounts, ({ one, many }) => ({
