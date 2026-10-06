@@ -2,10 +2,10 @@ import Link from "next/link";
 import { Container } from "@/components/ui/container";
 
 const quickLinks = [
-  ["خدمات ما", "#services"],
-  ["تعرفه‌ها", "#pricing"],
-  ["درباره ما", "#about"],
-  ["ارتباط با جاب یوتی", "#contact"],
+  ["خدمات ما", "/#services"],
+  ["تعرفه‌ها", "/#pricing"],
+  ["درباره ما", "/#about"],
+  ["ارتباط با جاب یوتی", "/#contact"],
 ];
 
 const messagingLabels = ["ایتا", "بله", "واتساپ", "تلگرام", "اینستاگرام", "لینکدین"];

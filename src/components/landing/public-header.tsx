@@ -14,11 +14,12 @@ export function PublicHeader() {
         </Link>
         <nav aria-label="ناوبری اصلی" className="order-3 flex w-full items-center gap-5 overflow-x-auto py-1 lg:order-none lg:w-auto">
           {[
-            ["خدمات ما", "#services"],
-            ["چرا جاب یوتی؟", "#why-jobut"],
-            ["درباره ما", "#about"],
-            ["تعرفه‌ها", "#pricing"],
-            ["ارتباط با ما", "#contact"],
+            ["شغل‌ها", "/jobs"],
+            ["خدمات ما", "/#services"],
+            ["چرا جاب یوتی؟", "/#why-jobut"],
+            ["درباره ما", "/#about"],
+            ["تعرفه‌ها", "/#pricing"],
+            ["ارتباط با ما", "/#contact"],
           ].map(([label, href]) => (
             <Link key={href} href={href} className="shrink-0 text-sm font-medium text-text-secondary hover:text-text-primary focus-visible:rounded focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-focus">{label}</Link>
           ))}
