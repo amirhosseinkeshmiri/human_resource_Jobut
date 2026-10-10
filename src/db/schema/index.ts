@@ -269,6 +269,70 @@ export const employerSessionRelations = relations(employerSessions, ({ one }) =>
   }),
 }));
 
+export const candidateAccounts = pgTable(
+  "candidate_accounts",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    email: varchar("email", { length: 320 }).unique(),
+    mobile: varchar("mobile", { length: 20 }).unique(),
+    ...timestamps,
+  },
+  (table) => [
+    check(
+      "candidate_accounts_contact_check",
+      sql`${table.email} is not null or ${table.mobile} is not null`,
+    ),
+  ],
+);
+
+export const candidateIdentifierType = pgEnum("candidate_identifier_type", ["email", "mobile"]);
+
+export const candidateAuthChallenges = pgTable(
+  "candidate_auth_challenges",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    identifier: varchar("identifier", { length: 320 }).notNull(),
+    identifierType: candidateIdentifierType("identifier_type").notNull(),
+    codeDigest: varchar("code_digest", { length: 64 }).notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    consumedAt: timestamp("consumed_at", { withTimezone: true }),
+    attempts: integer("attempts").default(0).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("candidate_auth_challenges_identifier_idx").on(table.identifier),
+    check(
+      "candidate_auth_challenges_attempts_check",
+      sql`${table.attempts} between 0 and 5`,
+    ),
+  ],
+);
+
+export const candidateSessions = pgTable(
+  "candidate_sessions",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    candidateAccountId: uuid("candidate_account_id")
+      .notNull()
+      .references(() => candidateAccounts.id, { onDelete: "cascade" }),
+    tokenDigest: varchar("token_digest", { length: 64 }).notNull().unique(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [index("candidate_sessions_account_id_idx").on(table.candidateAccountId)],
+);
+
+export const candidateAccountRelations = relations(candidateAccounts, ({ many }) => ({
+  sessions: many(candidateSessions),
+}));
+
+export const candidateSessionRelations = relations(candidateSessions, ({ one }) => ({
+  candidateAccount: one(candidateAccounts, {
+    fields: [candidateSessions.candidateAccountId],
+    references: [candidateAccounts.id],
+  }),
+}));
+
 export const industryRelations = relations(industries, ({ many }) => ({
   companies: many(companies),
 }));

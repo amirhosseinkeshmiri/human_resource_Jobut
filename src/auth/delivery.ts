@@ -1,12 +1,12 @@
 import "server-only";
-import type { EmployerIdentifier } from "./identifier";
+import type { AuthIdentifier } from "./identifier";
 
 export function hasDevelopmentDelivery() {
   return process.env.NODE_ENV !== "production";
 }
 
 export async function deliverVerificationCode(
-  _identifier: EmployerIdentifier,
+  _identifier: AuthIdentifier,
   code: string,
 ): Promise<{ developmentCode: string }> {
   if (!hasDevelopmentDelivery()) {

@@ -21,7 +21,7 @@ import {
   verificationCodeMatches,
 } from "./crypto";
 import { deliverVerificationCode, hasDevelopmentDelivery } from "./delivery";
-import { normalizeEmployerIdentifier, toLatinDigits } from "./identifier";
+import { normalizeEmployerIdentifier, normalizeVerificationCode } from "./identifier";
 import {
   destroyEmployerSession,
   setEmployerSessionCookie,
@@ -104,14 +104,13 @@ export async function verifyEmployerCode(
   formData: FormData,
 ): Promise<VerifyCodeState> {
   const challengeId = formData.get("challengeId");
-  const rawCode = formData.get("code");
-  const code = typeof rawCode === "string" ? toLatinDigits(rawCode.trim()) : "";
+  const code = normalizeVerificationCode(formData.get("code"));
 
   if (typeof challengeId !== "string" || !/^[0-9a-f-]{36}$/i.test(challengeId)) {
     return { status: "error", message: "درخواست ورود معتبر نیست. دوباره تلاش کنید." };
   }
 
-  if (!/^\d{6}$/.test(code)) {
+  if (!code) {
     return { status: "error", message: "کد ورود باید ۶ رقم باشد." };
   }
 

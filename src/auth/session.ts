@@ -6,8 +6,9 @@ import { db } from "@/db";
 import { employerAccounts, employerSessions } from "@/db/schema";
 import { digestSessionToken } from "./crypto";
 import { createEmployerSessionMaterial } from "./session-material";
+import { EMPLOYER_SESSION_COOKIE } from "./session-cookies";
 
-export const EMPLOYER_SESSION_COOKIE = "jobut_employer_session";
+export { EMPLOYER_SESSION_COOKIE } from "./session-cookies";
 
 export async function createEmployerSession(employerAccountId: string) {
   const session = createEmployerSessionMaterial(employerAccountId);

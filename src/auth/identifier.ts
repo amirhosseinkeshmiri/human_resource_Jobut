@@ -1,7 +1,8 @@
-export type EmployerIdentifier = {
+export type AuthIdentifier = {
   type: "email" | "mobile";
   value: string;
 };
+export type EmployerIdentifier = AuthIdentifier;
 
 const persianDigits = "۰۱۲۳۴۵۶۷۸۹";
 const arabicDigits = "٠١٢٣٤٥٦٧٨٩";
@@ -13,7 +14,7 @@ export function toLatinDigits(value: string) {
   });
 }
 
-export function normalizeEmployerIdentifier(input: string): EmployerIdentifier | null {
+export function normalizeAuthIdentifier(input: string): AuthIdentifier | null {
   const trimmed = input.trim();
 
   if (trimmed.includes("@")) {
@@ -28,4 +29,12 @@ export function normalizeEmployerIdentifier(input: string): EmployerIdentifier |
   const localNumber = compact.match(/^(?:\+98|98|0)?(9\d{9})$/)?.[1];
 
   return localNumber ? { type: "mobile", value: `+98${localNumber}` } : null;
+}
+
+export const normalizeEmployerIdentifier = normalizeAuthIdentifier;
+
+export function normalizeVerificationCode(input: unknown) {
+  if (typeof input !== "string") return null;
+  const code = toLatinDigits(input.trim());
+  return /^\d{6}$/.test(code) ? code : null;
 }
