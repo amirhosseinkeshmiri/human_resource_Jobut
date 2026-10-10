@@ -1,10 +1,14 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { applyToJob } from "@/applications/actions";
+import { getApplicationEligibility } from "@/applications/policy";
+import { getCandidateApplyState } from "@/applications/queries";
+import { getCurrentCandidate } from "@/candidate-auth/session";
 import { CompanyLogo } from "@/components/jobs/company-logo";
 import { PublicFooter } from "@/components/landing/public-footer";
 import { PublicHeader } from "@/components/landing/public-header";
-import { Badge, Card, Container, buttonClassNames } from "@/components/ui";
+import { Badge, Button, Card, Container, buttonClassNames } from "@/components/ui";
 import { sanitizeJobDescription } from "@/jobs/description";
 import { formatJobSalary } from "@/jobs/public-policy";
 import { getPublicJobById } from "@/jobs/public-queries";
@@ -31,8 +35,15 @@ const dateFormatter = new Intl.DateTimeFormat("fa-IR", { dateStyle: "long" });
 
 export default async function PublicJobPage({ params }: PublicJobPageProps) {
   const { jobId } = await params;
-  const job = await getPublicJobById(jobId);
+  const [job, candidate] = await Promise.all([getPublicJobById(jobId), getCurrentCandidate()]);
   if (!job) notFound();
+  const candidateState = candidate ? await getCandidateApplyState(candidate.id, job.id) : null;
+  const applicationEligibility = getApplicationEligibility({
+    authenticated: Boolean(candidate),
+    resumeComplete: candidateState?.resumeComplete ?? false,
+    alreadyApplied: candidateState?.alreadyApplied ?? false,
+    job,
+  });
 
   return (
     <>
@@ -86,6 +97,15 @@ export default async function PublicJobPage({ params }: PublicJobPageProps) {
                   <div><dt className="text-meta">تاریخ انتشار</dt><dd className="mt-1">{job.publishedAt ? dateFormatter.format(job.publishedAt) : "—"}</dd></div>
                   <div><dt className="text-meta">اعتبار تا</dt><dd className="mt-1">{job.expiresAt ? dateFormatter.format(job.expiresAt) : "—"}</dd></div>
                 </dl>
+              </Card>
+
+              <Card className="shadow-none">
+                <h2 className="text-card-title">ارسال درخواست</h2>
+                {applicationEligibility === "login-required" ? <><p className="text-secondary mt-2">برای ارسال رزومه وارد حساب کارجو شوید.</p><Link href="/login/candidate" className={buttonClassNames({ className: "mt-4 w-full" })}>ورود به حساب کارجو</Link></> : null}
+                {applicationEligibility === "resume-required" ? <><p className="text-secondary mt-2">برای ارسال درخواست ابتدا رزومه خود را تکمیل کنید.</p><Link href="/candidate/resume" className={buttonClassNames({ className: "mt-4 w-full" })}>تکمیل رزومه</Link></> : null}
+                {applicationEligibility === "already-applied" ? <><p className="mt-2 font-semibold text-success">درخواست شما ارسال شده است.</p><Link href="/candidate/applications" className={buttonClassNames({ variant: "secondary", className: "mt-4 w-full" })}>مشاهده درخواست‌های من</Link></> : null}
+                {applicationEligibility === "eligible" ? <><p className="text-secondary mt-2">رزومه فعلی جاب یوتی شما برای این فرصت ارسال می‌شود.</p><form action={applyToJob} className="mt-4"><input type="hidden" name="jobPostId" value={job.id} /><Button type="submit" className="w-full">ارسال رزومه</Button></form></> : null}
+                {applicationEligibility === "job-unavailable" ? <p className="text-secondary mt-2">این آگهی دیگر فعال نیست.</p> : null}
               </Card>
 
               <Link href="/jobs" className={buttonClassNames({ variant: "secondary", className: "w-full" })}>مشاهده سایر فرصت‌ها</Link>

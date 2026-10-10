@@ -50,6 +50,13 @@
       "when": 1791627735258,
       "tag": "0006_candidate_resume_foundation",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1791629860746,
+      "tag": "0007_job_application_foundation",
+      "breakpoints": true
     }
   ]
 }

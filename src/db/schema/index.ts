@@ -374,6 +374,29 @@ export const resumeLanguages = pgTable(
   ],
 );
 
+export const jobApplications = pgTable(
+  "job_applications",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    candidateAccountId: uuid("candidate_account_id")
+      .notNull()
+      .references(() => candidateAccounts.id, { onDelete: "restrict" }),
+    candidateResumeId: uuid("candidate_resume_id")
+      .notNull()
+      .references(() => candidateResumes.id, { onDelete: "restrict" }),
+    jobPostId: uuid("job_post_id")
+      .notNull()
+      .references(() => jobPosts.id, { onDelete: "restrict" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    unique("job_applications_candidate_job_unique").on(table.candidateAccountId, table.jobPostId),
+    index("job_applications_candidate_id_idx").on(table.candidateAccountId),
+    index("job_applications_resume_id_idx").on(table.candidateResumeId),
+    index("job_applications_job_id_idx").on(table.jobPostId),
+  ],
+);
+
 export const candidateIdentifierType = pgEnum("candidate_identifier_type", ["email", "mobile"]);
 
 export const candidateAuthChallenges = pgTable(
@@ -414,6 +437,7 @@ export const candidateSessions = pgTable(
 export const candidateAccountRelations = relations(candidateAccounts, ({ one, many }) => ({
   sessions: many(candidateSessions),
   resume: one(candidateResumes),
+  applications: many(jobApplications),
 }));
 
 export const candidateResumeRelations = relations(candidateResumes, ({ one, many }) => ({
@@ -424,6 +448,7 @@ export const candidateResumeRelations = relations(candidateResumes, ({ one, many
   experiences: many(resumeExperiences),
   educations: many(resumeEducations),
   languages: many(resumeLanguages),
+  applications: many(jobApplications),
 }));
 
 export const resumeExperienceRelations = relations(resumeExperiences, ({ one }) => ({
@@ -581,9 +606,25 @@ export const companyJobCreditTransactionRelations = relations(
   }),
 );
 
-export const jobPostRelations = relations(jobPosts, ({ one }) => ({
+export const jobPostRelations = relations(jobPosts, ({ one, many }) => ({
   company: one(companies, {
     fields: [jobPosts.companyId],
     references: [companies.id],
+  }),
+  applications: many(jobApplications),
+}));
+
+export const jobApplicationRelations = relations(jobApplications, ({ one }) => ({
+  candidateAccount: one(candidateAccounts, {
+    fields: [jobApplications.candidateAccountId],
+    references: [candidateAccounts.id],
+  }),
+  candidateResume: one(candidateResumes, {
+    fields: [jobApplications.candidateResumeId],
+    references: [candidateResumes.id],
+  }),
+  jobPost: one(jobPosts, {
+    fields: [jobApplications.jobPostId],
+    references: [jobPosts.id],
   }),
 }));

@@ -1,12 +1,12 @@
 import "server-only";
 import { cache } from "react";
-import { and, desc, eq, gt, isNotNull, sql } from "drizzle-orm";
+import { and, desc, eq, gt, isNotNull, sql, type SQL } from "drizzle-orm";
 import { db } from "@/db";
 import { companies, industries, jobPosts } from "@/db/schema";
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-function publicJobConditions(now: Date) {
+export function publicJobConditions(now: Date): SQL {
   return and(
     eq(jobPosts.status, "published"),
     isNotNull(jobPosts.publishedAt),
@@ -24,7 +24,7 @@ function publicJobConditions(now: Date) {
     sql`btrim(regexp_replace(${jobPosts.description}, '<[^>]*>', ' ', 'g')) <> ''`,
     sql`cardinality(${jobPosts.requiredSkills}) between 1 and 10`,
     sql`(${jobPosts.salaryNegotiable} = true or (${jobPosts.salaryNegotiable} = false and ${jobPosts.salaryMin} is not null and ${jobPosts.salaryMax} is not null and ${jobPosts.salaryMax} >= ${jobPosts.salaryMin}))`,
-  );
+  )!;
 }
 
 export async function getPublicJobs(now = new Date()) {
@@ -60,6 +60,7 @@ export const getPublicJobById = cache(async (jobId: string) => {
     .select({
       id: jobPosts.id,
       title: jobPosts.title,
+      status: jobPosts.status,
       workplaceType: jobPosts.workplaceType,
       employmentType: jobPosts.employmentType,
       location: jobPosts.location,
