@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { getAdminDashboardMetrics } from "@/admin/metrics";
 import { DashboardStatCard } from "@/components/dashboard/dashboard-stat-card";
 import { Card } from "@/components/ui";
@@ -12,7 +13,7 @@ export default async function AdminDashboardPage() {
   const cards = [
     { label: "کل آگهی‌ها", value: numberFormatter.format(metrics.totalJobPosts), description: "تمام وضعیت‌های آگهی" },
     { label: "آگهی‌های منتشرشده", value: numberFormatter.format(metrics.publishedJobPosts), description: "وضعیت منتشرشده در پایگاه داده" },
-    { label: "کارفرماها", value: numberFormatter.format(metrics.companies), description: "شرکت‌های ثبت‌شده" },
+    { label: "کارفرماها", value: numberFormatter.format(metrics.companies), description: "شرکت‌های ثبت‌شده", href: "/admin/employers" },
     { label: "حساب‌های کارجو", value: numberFormatter.format(metrics.candidateAccounts), description: "هویت‌های احراز‌شده کارجو" },
     { label: "مبلغ خریدهای پرداخت‌شده", value: `${numberFormatter.format(metrics.paidPurchaseAmountToman)} تومان`, description: "جمع مبلغ بسته‌های دارای وضعیت پرداخت‌شده" },
     { label: "اعتبار فعلی کارفرماها", value: numberFormatter.format(metrics.totalEmployerCredits), description: "جمع مانده دفترکل اعتبار همه شرکت‌ها" },
@@ -26,7 +27,11 @@ export default async function AdminDashboardPage() {
         <p className="text-secondary mt-3">خلاصه وضعیت فعلی داده‌های قابل اتکای جاب یوتی.</p>
       </div>
       <section aria-label="شاخص‌های مدیریتی" className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-        {cards.map((card) => <DashboardStatCard key={card.label} {...card} />)}
+        {cards.map((card) => card.href ? (
+          <Link key={card.label} href={card.href} className="rounded-lg outline-none transition-transform hover:-translate-y-0.5 focus-visible:ring-2 focus-visible:ring-focus">
+            <DashboardStatCard {...card} />
+          </Link>
+        ) : <DashboardStatCard key={card.label} {...card} />)}
       </section>
       <Card className="mt-8 shadow-none">
         <h2 className="text-card-title">دامنه گزارش فعلی</h2>
