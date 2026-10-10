@@ -26,9 +26,9 @@ export default async function EmployerHomePage() {
           description="تعداد آگهی‌های منتشرشده شرکت"
         />
         <DashboardStatCard
-          label="رزومه‌های جدید"
-          value="—"
-          description="پس از پیاده‌سازی دامنه کارجو و درخواست‌ها در دسترس خواهد بود."
+          label="رزومه‌های دریافتی"
+          value={metrics.receivedApplications.toLocaleString("fa-IR")}
+          description="کل درخواست‌های ارسال‌شده برای آگهی‌های شرکت"
         />
         <DashboardStatCard
           label="آگهی‌های باقیمانده"

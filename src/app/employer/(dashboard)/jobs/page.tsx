@@ -50,10 +50,9 @@ export default async function EmployerJobsPage() {
                   <p className="text-helper mt-2">
                     آخرین به‌روزرسانی: <time dateTime={job.updatedAt.toISOString()}>{dateFormatter.format(job.updatedAt)}</time>
                   </p>
+                  <p className="text-helper mt-1">رزومه‌های دریافتی: {numberFormatter.format(job.applicationCount)}</p>
                 </div>
-                <Link href={`/employer/jobs/${job.id}`} className={buttonClassNames({ variant: "secondary", size: "small", className: "w-full sm:w-auto" })}>
-                  {job.status === "draft" ? "ویرایش" : "مشاهده"}
-                </Link>
+                <div className="grid gap-2"><Link href={`/employer/jobs/${job.id}`} className={buttonClassNames({ variant: "secondary", size: "small", className: "w-full sm:w-auto" })}>{job.status === "draft" ? "ویرایش" : "مشاهده"}</Link>{job.applicationCount > 0 ? <Link href={`/employer/jobs/${job.id}/applications`} className={buttonClassNames({ variant: "ghost", size: "small", className: "w-full sm:w-auto" })}>مشاهده درخواست‌ها</Link> : null}</div>
               </Card>
             ))}
           </section>

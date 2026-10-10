@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { Badge, Button, Card, buttonClassNames } from "@/components/ui";
 import { JobPostForm } from "@/components/jobs/job-post-form";
 import { getEmployerDashboardContext } from "@/dashboard/context";
+import { getJobApplicationCount } from "@/applicants/queries";
 import { getRemainingJobCredits } from "@/dashboard/metrics";
 import { publishDraftJob, updateDraftJob } from "@/jobs/actions";
 import { jobStatusLabels } from "@/jobs/policy";
@@ -31,9 +32,10 @@ interface JobPageProps {
 export default async function JobPage({ params, searchParams }: JobPageProps) {
   const [{ jobId }, query, { company }] = await Promise.all([params, searchParams, getEmployerDashboardContext()]);
   if (!UUID_PATTERN.test(jobId)) notFound();
-  const [job, remainingJobCredits] = await Promise.all([
+  const [job, remainingJobCredits, applicationCount] = await Promise.all([
     getCompanyJobPost(company.id, jobId),
     getRemainingJobCredits(company.id),
+    getJobApplicationCount(company.id, jobId),
   ]);
   if (!job) notFound();
 
@@ -97,6 +99,9 @@ export default async function JobPage({ params, searchParams }: JobPageProps) {
             <Link href="/employer/jobs" className={buttonClassNames({ variant: "secondary", className: "mt-6" })}>بازگشت به آگهی‌ها</Link>
           </div>
         )}
+      </Card>
+      <Card className="mt-4 shadow-none">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"><div><h2 className="text-card-title">رزومه‌های دریافتی</h2><p className="text-secondary mt-2">{applicationCount.toLocaleString("fa-IR")} درخواست برای این آگهی</p></div>{applicationCount > 0 ? <Link href={`/employer/jobs/${job.id}/applications`} className={buttonClassNames({ variant: "secondary", className: "w-full sm:w-auto" })}>مشاهده درخواست‌ها</Link> : null}</div>
       </Card>
       {job.status === "draft" ? (
         <Card className="mt-4 shadow-none">

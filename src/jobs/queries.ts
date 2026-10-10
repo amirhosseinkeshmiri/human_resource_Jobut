@@ -1,16 +1,23 @@
 import "server-only";
-import { and, desc, eq } from "drizzle-orm";
+import { and, count, desc, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { jobPosts } from "@/db/schema";
+import { jobApplications, jobPosts } from "@/db/schema";
 
 export async function getCompanyJobPosts(companyId: string) {
+  const applicationCounts = db.select({
+    jobPostId: jobApplications.jobPostId,
+    value: count().as("application_count"),
+  }).from(jobApplications).groupBy(jobApplications.jobPostId).as("application_counts");
   return db.select({
     id: jobPosts.id,
     title: jobPosts.title,
     status: jobPosts.status,
     createdAt: jobPosts.createdAt,
     updatedAt: jobPosts.updatedAt,
-  }).from(jobPosts).where(eq(jobPosts.companyId, companyId)).orderBy(desc(jobPosts.createdAt));
+    applicationCount: sql<number>`coalesce(${applicationCounts.value}, 0)`.mapWith(Number),
+  }).from(jobPosts)
+    .leftJoin(applicationCounts, eq(jobPosts.id, applicationCounts.jobPostId))
+    .where(eq(jobPosts.companyId, companyId)).orderBy(desc(jobPosts.createdAt));
 }
 
 export async function getCompanyJobPost(companyId: string, jobId: string) {
