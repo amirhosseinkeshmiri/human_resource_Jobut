@@ -11,12 +11,12 @@ const numberFormatter = new Intl.NumberFormat("fa-IR");
 export default async function AdminDashboardPage() {
   const metrics = await getAdminDashboardMetrics();
   const cards = [
-    { label: "کل آگهی‌ها", value: numberFormatter.format(metrics.totalJobPosts), description: "تمام وضعیت‌های آگهی" },
-    { label: "آگهی‌های منتشرشده", value: numberFormatter.format(metrics.publishedJobPosts), description: "وضعیت منتشرشده در پایگاه داده" },
+    { label: "کل آگهی‌ها", value: numberFormatter.format(metrics.totalJobPosts), description: "تمام وضعیت‌های آگهی", href: "/admin/jobs" },
+    { label: "آگهی‌های منتشرشده", value: numberFormatter.format(metrics.publishedJobPosts), description: "وضعیت منتشرشده در پایگاه داده", href: "/admin/jobs?status=published_active" },
     { label: "کارفرماها", value: numberFormatter.format(metrics.companies), description: "شرکت‌های ثبت‌شده", href: "/admin/employers" },
     { label: "حساب‌های کارجو", value: numberFormatter.format(metrics.candidateAccounts), description: "هویت‌های احراز‌شده کارجو" },
-    { label: "مبلغ خریدهای پرداخت‌شده", value: `${numberFormatter.format(metrics.paidPurchaseAmountToman)} تومان`, description: "جمع مبلغ بسته‌های دارای وضعیت پرداخت‌شده" },
-    { label: "اعتبار فعلی کارفرماها", value: numberFormatter.format(metrics.totalEmployerCredits), description: "جمع مانده دفترکل اعتبار همه شرکت‌ها" },
+    { label: "مبلغ خریدهای پرداخت‌شده", value: `${numberFormatter.format(metrics.paidPurchaseAmountToman)} تومان`, description: "جمع مبلغ بسته‌های دارای وضعیت پرداخت‌شده", href: "/admin/sales" },
+    { label: "اعتبار فعلی کارفرماها", value: numberFormatter.format(metrics.totalEmployerCredits), description: "جمع مانده دفترکل اعتبار همه شرکت‌ها", href: "/admin/sales" },
   ];
 
   return (
