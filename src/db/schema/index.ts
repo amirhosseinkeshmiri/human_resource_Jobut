@@ -333,6 +333,70 @@ export const candidateSessionRelations = relations(candidateSessions, ({ one }) 
   }),
 }));
 
+export const adminAccounts = pgTable(
+  "admin_accounts",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    email: varchar("email", { length: 320 }).unique(),
+    mobile: varchar("mobile", { length: 20 }).unique(),
+    ...timestamps,
+  },
+  (table) => [
+    check(
+      "admin_accounts_contact_check",
+      sql`${table.email} is not null or ${table.mobile} is not null`,
+    ),
+  ],
+);
+
+export const adminIdentifierType = pgEnum("admin_identifier_type", ["email", "mobile"]);
+
+export const adminAuthChallenges = pgTable(
+  "admin_auth_challenges",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    identifier: varchar("identifier", { length: 320 }).notNull(),
+    identifierType: adminIdentifierType("identifier_type").notNull(),
+    codeDigest: varchar("code_digest", { length: 64 }).notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    consumedAt: timestamp("consumed_at", { withTimezone: true }),
+    attempts: integer("attempts").default(0).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("admin_auth_challenges_identifier_idx").on(table.identifier),
+    check(
+      "admin_auth_challenges_attempts_check",
+      sql`${table.attempts} between 0 and 5`,
+    ),
+  ],
+);
+
+export const adminSessions = pgTable(
+  "admin_sessions",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    adminAccountId: uuid("admin_account_id")
+      .notNull()
+      .references(() => adminAccounts.id, { onDelete: "cascade" }),
+    tokenDigest: varchar("token_digest", { length: 64 }).notNull().unique(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [index("admin_sessions_account_id_idx").on(table.adminAccountId)],
+);
+
+export const adminAccountRelations = relations(adminAccounts, ({ many }) => ({
+  sessions: many(adminSessions),
+}));
+
+export const adminSessionRelations = relations(adminSessions, ({ one }) => ({
+  adminAccount: one(adminAccounts, {
+    fields: [adminSessions.adminAccountId],
+    references: [adminAccounts.id],
+  }),
+}));
+
 export const industryRelations = relations(industries, ({ many }) => ({
   companies: many(companies),
 }));
