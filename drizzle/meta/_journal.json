@@ -43,6 +43,13 @@
       "when": 1791615464401,
       "tag": "0005_nosy_blindfold",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1791627735258,
+      "tag": "0006_candidate_resume_foundation",
+      "breakpoints": true
     }
   ]
 }

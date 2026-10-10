@@ -2,6 +2,7 @@ import { relations, sql } from "drizzle-orm";
 import {
   boolean,
   check,
+  date,
   index,
   integer,
   pgEnum,
@@ -285,6 +286,94 @@ export const candidateAccounts = pgTable(
   ],
 );
 
+export const resumeLanguageProficiency = pgEnum("resume_language_proficiency", [
+  "basic",
+  "intermediate",
+  "advanced",
+  "fluent",
+  "native",
+]);
+
+export const candidateResumes = pgTable(
+  "candidate_resumes",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    candidateAccountId: uuid("candidate_account_id")
+      .notNull()
+      .references(() => candidateAccounts.id, { onDelete: "cascade" }),
+    firstName: varchar("first_name", { length: 100 }).notNull(),
+    lastName: varchar("last_name", { length: 120 }).notNull(),
+    city: varchar("city", { length: 160 }).notNull(),
+    professionalTitle: varchar("professional_title", { length: 160 }).notNull(),
+    professionalSummary: text("professional_summary").notNull(),
+    skills: text("skills").array().notNull(),
+    linkedinUrl: text("linkedin_url"),
+    portfolioUrl: text("portfolio_url"),
+    ...timestamps,
+  },
+  (table) => [unique("candidate_resumes_candidate_account_unique").on(table.candidateAccountId)],
+);
+
+export const resumeExperiences = pgTable(
+  "resume_experiences",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    resumeId: uuid("resume_id").notNull().references(() => candidateResumes.id, { onDelete: "cascade" }),
+    jobTitle: varchar("job_title", { length: 160 }).notNull(),
+    companyName: varchar("company_name", { length: 200 }).notNull(),
+    startDate: date("start_date").notNull(),
+    endDate: date("end_date"),
+    isCurrent: boolean("is_current").default(false).notNull(),
+    description: text("description"),
+    sortOrder: integer("sort_order").notNull(),
+    ...timestamps,
+  },
+  (table) => [
+    unique("resume_experiences_resume_sort_unique").on(table.resumeId, table.sortOrder),
+    index("resume_experiences_resume_id_idx").on(table.resumeId),
+    check("resume_experiences_sort_order_check", sql`${table.sortOrder} >= 0`),
+    check("resume_experiences_dates_check", sql`(${table.isCurrent} = true and ${table.endDate} is null) or (${table.isCurrent} = false and ${table.endDate} is not null and ${table.endDate} >= ${table.startDate})`),
+  ],
+);
+
+export const resumeEducations = pgTable(
+  "resume_educations",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    resumeId: uuid("resume_id").notNull().references(() => candidateResumes.id, { onDelete: "cascade" }),
+    fieldOfStudy: varchar("field_of_study", { length: 160 }).notNull(),
+    institutionName: varchar("institution_name", { length: 200 }).notNull(),
+    degree: varchar("degree", { length: 120 }).notNull(),
+    startDate: date("start_date").notNull(),
+    endDate: date("end_date"),
+    isCurrent: boolean("is_current").default(false).notNull(),
+    sortOrder: integer("sort_order").notNull(),
+    ...timestamps,
+  },
+  (table) => [
+    unique("resume_educations_resume_sort_unique").on(table.resumeId, table.sortOrder),
+    index("resume_educations_resume_id_idx").on(table.resumeId),
+    check("resume_educations_sort_order_check", sql`${table.sortOrder} >= 0`),
+    check("resume_educations_dates_check", sql`(${table.isCurrent} = true and ${table.endDate} is null) or (${table.isCurrent} = false and ${table.endDate} is not null and ${table.endDate} >= ${table.startDate})`),
+  ],
+);
+
+export const resumeLanguages = pgTable(
+  "resume_languages",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    resumeId: uuid("resume_id").notNull().references(() => candidateResumes.id, { onDelete: "cascade" }),
+    name: varchar("name", { length: 100 }).notNull(),
+    proficiency: resumeLanguageProficiency("proficiency").notNull(),
+    sortOrder: integer("sort_order").notNull(),
+  },
+  (table) => [
+    unique("resume_languages_resume_sort_unique").on(table.resumeId, table.sortOrder),
+    index("resume_languages_resume_id_idx").on(table.resumeId),
+    check("resume_languages_sort_order_check", sql`${table.sortOrder} >= 0`),
+  ],
+);
+
 export const candidateIdentifierType = pgEnum("candidate_identifier_type", ["email", "mobile"]);
 
 export const candidateAuthChallenges = pgTable(
@@ -322,8 +411,31 @@ export const candidateSessions = pgTable(
   (table) => [index("candidate_sessions_account_id_idx").on(table.candidateAccountId)],
 );
 
-export const candidateAccountRelations = relations(candidateAccounts, ({ many }) => ({
+export const candidateAccountRelations = relations(candidateAccounts, ({ one, many }) => ({
   sessions: many(candidateSessions),
+  resume: one(candidateResumes),
+}));
+
+export const candidateResumeRelations = relations(candidateResumes, ({ one, many }) => ({
+  candidateAccount: one(candidateAccounts, {
+    fields: [candidateResumes.candidateAccountId],
+    references: [candidateAccounts.id],
+  }),
+  experiences: many(resumeExperiences),
+  educations: many(resumeEducations),
+  languages: many(resumeLanguages),
+}));
+
+export const resumeExperienceRelations = relations(resumeExperiences, ({ one }) => ({
+  resume: one(candidateResumes, { fields: [resumeExperiences.resumeId], references: [candidateResumes.id] }),
+}));
+
+export const resumeEducationRelations = relations(resumeEducations, ({ one }) => ({
+  resume: one(candidateResumes, { fields: [resumeEducations.resumeId], references: [candidateResumes.id] }),
+}));
+
+export const resumeLanguageRelations = relations(resumeLanguages, ({ one }) => ({
+  resume: one(candidateResumes, { fields: [resumeLanguages.resumeId], references: [candidateResumes.id] }),
 }));
 
 export const candidateSessionRelations = relations(candidateSessions, ({ one }) => ({

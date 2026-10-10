@@ -1,0 +1,17 @@
+import Link from "next/link";
+import { Badge, Card, buttonClassNames } from "@/components/ui";
+import type { getCandidateResume } from "@/resume/queries";
+import { languageProficiencyLabels } from "@/resume/validation";
+
+interface ResumePreviewProps { resume: NonNullable<Awaited<ReturnType<typeof getCandidateResume>>>; }
+
+const dateFormatter = new Intl.DateTimeFormat("fa-IR", { year: "numeric", month: "long", timeZone: "UTC" });
+function formatDate(value: string) { return dateFormatter.format(new Date(`${value}T00:00:00.000Z`)); }
+
+export function ResumePreview({ resume }: ResumePreviewProps) {
+  return <div className="grid gap-6"><Card className="shadow-none"><div className="flex flex-wrap items-start justify-between gap-4"><div><p className="text-meta">رزومه من</p><h1 className="text-page-title mt-2">{resume.firstName} {resume.lastName}</h1><p className="mt-2 font-semibold text-action">{resume.professionalTitle}</p><p className="text-secondary mt-1">{resume.city}</p></div><Link href="/candidate/resume?mode=edit" className={buttonClassNames({ variant: "secondary", size: "small" })}>ویرایش رزومه</Link></div><p className="text-body mt-6 whitespace-pre-wrap text-text-secondary">{resume.professionalSummary}</p><div className="mt-5 flex flex-wrap gap-2">{resume.skills.map((skill) => <Badge key={skill}>{skill}</Badge>)}</div>{resume.linkedinUrl || resume.portfolioUrl ? <div className="mt-5 flex flex-wrap gap-4 text-sm font-semibold text-action">{resume.linkedinUrl ? <a href={resume.linkedinUrl} target="_blank" rel="noreferrer" className="outline-none hover:underline focus-visible:ring-2 focus-visible:ring-focus">لینکدین</a> : null}{resume.portfolioUrl ? <a href={resume.portfolioUrl} target="_blank" rel="noreferrer" className="outline-none hover:underline focus-visible:ring-2 focus-visible:ring-focus">نمونه‌کار</a> : null}</div> : null}</Card>
+    {resume.experiences.length ? <Card className="shadow-none"><h2 className="text-section-title">سوابق شغلی</h2><div className="mt-5 grid gap-5">{resume.experiences.map((item) => <article key={item.id} className="border-b border-ui-border pb-5 last:border-0 last:pb-0"><h3 className="font-bold">{item.jobTitle}</h3><p className="text-secondary mt-1">{item.companyName}</p><p className="text-helper mt-2">{formatDate(item.startDate)} تا {item.isCurrent ? "اکنون" : item.endDate ? formatDate(item.endDate) : "—"}</p>{item.description ? <p className="text-body mt-3 whitespace-pre-wrap text-text-secondary">{item.description}</p> : null}</article>)}</div></Card> : null}
+    {resume.educations.length ? <Card className="shadow-none"><h2 className="text-section-title">تحصیلات</h2><div className="mt-5 grid gap-5">{resume.educations.map((item) => <article key={item.id} className="border-b border-ui-border pb-5 last:border-0 last:pb-0"><h3 className="font-bold">{item.fieldOfStudy} · {item.degree}</h3><p className="text-secondary mt-1">{item.institutionName}</p><p className="text-helper mt-2">{formatDate(item.startDate)} تا {item.isCurrent ? "اکنون" : item.endDate ? formatDate(item.endDate) : "—"}</p></article>)}</div></Card> : null}
+    {resume.languages.length ? <Card className="shadow-none"><h2 className="text-section-title">زبان‌ها</h2><div className="mt-4 flex flex-wrap gap-2">{resume.languages.map((item) => <Badge key={item.id}>{item.name} · {languageProficiencyLabels[item.proficiency]}</Badge>)}</div></Card> : null}
+  </div>;
+}
