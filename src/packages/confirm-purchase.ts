@@ -9,7 +9,16 @@ import { purchaseSuccessDecision } from "./purchase-policy";
  * This is deliberately not a Server Action and is never exposed to browser UI.
  */
 export async function confirmPackagePurchasePaid(purchaseId: string) {
-  return db.transaction(async (transaction) => {
+  return db.transaction((transaction) =>
+    confirmPackagePurchasePaidInTransaction(transaction, purchaseId, new Date()),
+  );
+}
+
+export async function confirmPackagePurchasePaidInTransaction(
+  transaction: Parameters<Parameters<typeof db.transaction>[0]>[0],
+  purchaseId: string,
+  paidAt: Date,
+) {
     const [purchase] = await transaction
       .select({
         id: packagePurchases.id,
@@ -35,7 +44,7 @@ export async function confirmPackagePurchasePaid(purchaseId: string) {
 
     const [updatedPurchase] = await transaction
       .update(packagePurchases)
-      .set({ status: "paid", paidAt: new Date(), updatedAt: new Date() })
+      .set({ status: "paid", paidAt, updatedAt: paidAt })
       .where(and(eq(packagePurchases.id, purchase.id), eq(packagePurchases.status, "pending")))
       .returning({ id: packagePurchases.id });
 
@@ -48,5 +57,4 @@ export async function confirmPackagePurchasePaid(purchaseId: string) {
     });
 
     return { allocated: true } as const;
-  });
 }

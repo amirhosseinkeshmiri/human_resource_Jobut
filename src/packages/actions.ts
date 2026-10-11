@@ -19,6 +19,7 @@ export async function initiatePackagePurchase(formData: FormData) {
   if (!UUID_PATTERN.test(packageId)) redirect("/employer/packages?purchase=unavailable");
 
   let outcome: "pending" | "unavailable" | "error" = "error";
+  let createdPurchaseId: string | null = null;
 
   try {
     const [jobPackage] = await db
@@ -36,14 +37,19 @@ export async function initiatePackagePurchase(formData: FormData) {
     if (!jobPackage || !canInitiatePackagePurchase(jobPackage)) {
       outcome = "unavailable";
     } else {
-      await db
+      const [purchase] = await db
         .insert(packagePurchases)
-        .values(createPendingPurchaseSnapshot(company.id, jobPackage));
-      outcome = "pending";
+        .values(createPendingPurchaseSnapshot(company.id, jobPackage))
+        .returning({ id: packagePurchases.id });
+      createdPurchaseId = purchase.id;
     }
   } catch {
     outcome = "error";
   }
 
-  redirect(`/employer/packages?purchase=${outcome}`);
+  redirect(
+    createdPurchaseId
+      ? `/employer/packages/purchases/${createdPurchaseId}`
+      : `/employer/packages?purchase=${outcome}`,
+  );
 }

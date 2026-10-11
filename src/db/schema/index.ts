@@ -1,6 +1,7 @@
 import { relations, sql } from "drizzle-orm";
 import {
   boolean,
+  bigint,
   check,
   date,
   index,
@@ -166,6 +167,14 @@ export const jobPackages = pgTable(
 
 export const packagePurchaseStatus = pgEnum("package_purchase_status", ["pending", "paid"]);
 
+export const paymentAttemptStatus = pgEnum("payment_attempt_status", [
+  "created",
+  "redirect_ready",
+  "verified",
+  "failed",
+  "canceled",
+]);
+
 export const packagePurchases = pgTable(
   "package_purchases",
   {
@@ -188,6 +197,36 @@ export const packagePurchases = pgTable(
     index("package_purchases_company_id_idx").on(table.companyId),
     check("package_purchases_credits_check", sql`${table.jobCredits} > 0`),
     check("package_purchases_price_check", sql`${table.priceToman} >= 0`),
+  ],
+);
+
+export const paymentAttempts = pgTable(
+  "payment_attempts",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    packagePurchaseId: uuid("package_purchase_id")
+      .notNull()
+      .references(() => packagePurchases.id, { onDelete: "restrict" }),
+    provider: varchar("provider", { length: 16 }).default("SEP").notNull(),
+    status: paymentAttemptStatus("status").default("created").notNull(),
+    amountRial: bigint("amount_rial", { mode: "number" }).notNull(),
+    resNum: varchar("res_num", { length: 80 }).notNull().unique(),
+    refNum: varchar("ref_num", { length: 160 }).unique(),
+    gatewayState: varchar("gateway_state", { length: 80 }),
+    failureCategory: varchar("failure_category", { length: 80 }),
+    verifiedAt: timestamp("verified_at", { withTimezone: true }),
+    failedAt: timestamp("failed_at", { withTimezone: true }),
+    ...timestamps,
+  },
+  (table) => [
+    index("payment_attempts_purchase_id_idx").on(table.packagePurchaseId),
+    index("payment_attempts_active_idx").on(
+      table.packagePurchaseId,
+      table.status,
+      table.createdAt,
+    ),
+    check("payment_attempts_provider_check", sql`${table.provider} = 'SEP'`),
+    check("payment_attempts_amount_check", sql`${table.amountRial} > 0`),
   ],
 );
 
@@ -580,7 +619,7 @@ export const jobPackageRelations = relations(jobPackages, ({ many }) => ({
   purchases: many(packagePurchases),
 }));
 
-export const packagePurchaseRelations = relations(packagePurchases, ({ one }) => ({
+export const packagePurchaseRelations = relations(packagePurchases, ({ one, many }) => ({
   company: one(companies, {
     fields: [packagePurchases.companyId],
     references: [companies.id],
@@ -590,6 +629,14 @@ export const packagePurchaseRelations = relations(packagePurchases, ({ one }) =>
     references: [jobPackages.id],
   }),
   creditTransaction: one(companyJobCreditTransactions),
+  paymentAttempts: many(paymentAttempts),
+}));
+
+export const paymentAttemptRelations = relations(paymentAttempts, ({ one }) => ({
+  packagePurchase: one(packagePurchases, {
+    fields: [paymentAttempts.packagePurchaseId],
+    references: [packagePurchases.id],
+  }),
 }));
 
 export const companyJobCreditTransactionRelations = relations(

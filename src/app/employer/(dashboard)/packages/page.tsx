@@ -1,15 +1,16 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { initiatePackagePurchase } from "@/packages/actions";
 import { getEmployerPackagesPageData } from "@/packages/queries";
 import { getEmployerDashboardContext } from "@/dashboard/context";
-import { Badge, Button, Card } from "@/components/ui";
+import { Badge, Button, Card, buttonClassNames } from "@/components/ui";
 
 export const metadata: Metadata = {
   title: "بسته‌های فعال",
 };
 
 interface EmployerPackagesPageProps {
-  searchParams: Promise<{ purchase?: string | string[] }>;
+  searchParams: Promise<{ purchase?: string | string[]; payment?: string | string[] }>;
 }
 
 const numberFormatter = new Intl.NumberFormat("fa-IR");
@@ -22,10 +23,13 @@ export default async function EmployerPackagesPage({ searchParams }: EmployerPac
   ]);
   const data = await getEmployerPackagesPageData(company.id);
   const purchaseState = typeof params.purchase === "string" ? params.purchase : undefined;
+  const paymentState = typeof params.payment === "string" ? params.payment : undefined;
 
   const purchaseMessage =
-    purchaseState === "pending"
-      ? "درخواست خرید به‌صورت در انتظار پرداخت ثبت شد. پرداخت آنلاین هنوز فعال نیست."
+    paymentState === "invalid"
+      ? "نتیجه پرداخت قابل شناسایی نبود. وضعیت درخواست را از سابقه بررسی کنید."
+      : purchaseState === "pending"
+      ? "درخواست خرید به‌صورت در انتظار پرداخت ثبت شد."
       : purchaseState === "unavailable"
         ? "بسته انتخاب‌شده در دسترس نیست."
         : purchaseState === "error"
@@ -74,7 +78,7 @@ export default async function EmployerPackagesPage({ searchParams }: EmployerPac
                   <input type="hidden" name="packageId" value={jobPackage.id} />
                   <Button type="submit" className="w-full">ثبت درخواست خرید</Button>
                 </form>
-                <p className="text-helper mt-3">پرداخت آنلاین هنوز پیکربندی نشده است.</p>
+                <p className="text-helper mt-3">پس از ثبت، برای پرداخت امن به درگاه سامان هدایت می‌شوید.</p>
               </Card>
             ))}
           </div>
@@ -105,9 +109,17 @@ export default async function EmployerPackagesPage({ searchParams }: EmployerPac
                     {numberFormatter.format(purchase.jobCredits)} اعتبار · {numberFormatter.format(purchase.priceToman)} تومان
                   </p>
                 </div>
-                <time className="text-meta" dateTime={purchase.purchasedAt.toISOString()}>
-                  {dateFormatter.format(purchase.purchasedAt)}
-                </time>
+                <div className="flex flex-col items-start gap-2 sm:items-end">
+                  <time className="text-meta" dateTime={purchase.purchasedAt.toISOString()}>
+                    {dateFormatter.format(purchase.purchasedAt)}
+                  </time>
+                  <Link
+                    href={`/employer/packages/purchases/${purchase.id}`}
+                    className={buttonClassNames({ variant: "secondary", size: "small" })}
+                  >
+                    {purchase.status === "paid" ? "مشاهده رسید" : "ادامه پرداخت"}
+                  </Link>
+                </div>
               </Card>
             ))}
           </div>

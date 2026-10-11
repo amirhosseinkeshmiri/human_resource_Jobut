@@ -1,5 +1,5 @@
 import "server-only";
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { jobPackages, packagePurchases } from "@/db/schema";
 import { getRemainingJobCredits } from "@/dashboard/metrics";
@@ -33,4 +33,24 @@ export async function getEmployerPackagesPageData(companyId: string) {
   ]);
 
   return { availablePackages, purchases, remainingJobCredits };
+}
+
+export async function getCompanyPackagePurchase(companyId: string, purchaseId: string) {
+  const [purchase] = await db
+    .select({
+      id: packagePurchases.id,
+      packageName: packagePurchases.packageName,
+      jobCredits: packagePurchases.jobCredits,
+      priceToman: packagePurchases.priceToman,
+      status: packagePurchases.status,
+      purchasedAt: packagePurchases.purchasedAt,
+      paidAt: packagePurchases.paidAt,
+    })
+    .from(packagePurchases)
+    .where(
+      and(eq(packagePurchases.id, purchaseId), eq(packagePurchases.companyId, companyId)),
+    )
+    .limit(1);
+
+  return purchase ?? null;
 }

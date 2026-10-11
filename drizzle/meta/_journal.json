@@ -57,6 +57,13 @@
       "when": 1791629860746,
       "tag": "0007_job_application_foundation",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1791707394106,
+      "tag": "0008_zippy_molecule_man",
+      "breakpoints": true
     }
   ]
 }
