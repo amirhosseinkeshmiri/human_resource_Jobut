@@ -24,7 +24,7 @@ export default async function AdminDashboardPage() {
       <div>
         <p className="text-meta">نمای عملیاتی</p>
         <h1 className="text-page-title mt-2">داشبورد مدیریت</h1>
-        <p className="text-secondary mt-3">خلاصه وضعیت فعلی داده‌های قابل اتکای جاب یوتی.</p>
+        <p className="text-secondary mt-3">خلاصه وضعیت فعلی داده‌های قابل اتکای شبکه استخدامی متخصصین آکادمیک.</p>
       </div>
       <section aria-label="شاخص‌های مدیریتی" className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         {cards.map((card) => card.href ? (

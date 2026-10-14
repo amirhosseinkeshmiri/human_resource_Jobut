@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getCurrentAdmin } from "@/admin-auth/session";
+import { BrandLogo } from "@/components/brand/brand-logo";
 import { AdminLoginForm } from "@/components/auth/admin-login-form";
 import { Card, Container } from "@/components/ui";
 
@@ -14,8 +15,9 @@ export default async function AdminLoginPage() {
     <main className="grid min-h-screen place-items-center bg-surface-elevated py-10">
       <Container>
         <Card className="mx-auto max-w-md border-t-4 border-t-action">
+          <BrandLogo className="mx-auto mb-6 w-24" />
           <div className="mb-7">
-            <p className="text-meta">JobUT Admin</p>
+            <p className="text-meta">JOBUT Admin</p>
             <h1 className="text-section-title mt-2">ورود به مدیریت</h1>
             <p className="text-secondary mt-2">ورود فقط برای حساب‌های مدیریتی از پیش تعریف‌شده امکان‌پذیر است.</p>
           </div>

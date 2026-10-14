@@ -23,11 +23,11 @@ interface PublicJobPageProps {
 export async function generateMetadata({ params }: PublicJobPageProps): Promise<Metadata> {
   const { jobId } = await params;
   const job = await getPublicJobById(jobId);
-  if (!job) return { title: "فرصت شغلی پیدا نشد" };
+  if (!job) return { title: "آگهی پیدا نشد" };
 
   return {
     title: `${job.title} در ${job.companyName}`,
-    description: `فرصت شغلی ${job.title} در ${job.companyName}`,
+    description: `آگهی ${job.title} در ${job.companyName}`,
   };
 }
 
@@ -50,7 +50,7 @@ export default async function PublicJobPage({ params }: PublicJobPageProps) {
       <PublicHeader />
       <main>
         <Container className="py-8 sm:py-12">
-          <Link href="/jobs" className="text-sm font-semibold text-action outline-none hover:text-action-hover focus-visible:rounded focus-visible:ring-2 focus-visible:ring-focus/30">بازگشت به فرصت‌های شغلی</Link>
+          <Link href="/jobs" className="text-sm font-semibold text-action outline-none hover:text-action-hover focus-visible:rounded focus-visible:ring-2 focus-visible:ring-focus/30">بازگشت به آگهی‌ها</Link>
 
           <div className="mt-6 grid gap-5 lg:grid-cols-[minmax(0,1fr)_18rem] lg:items-start">
             <article className="grid gap-5">
@@ -104,11 +104,11 @@ export default async function PublicJobPage({ params }: PublicJobPageProps) {
                 {applicationEligibility === "login-required" ? <><p className="text-secondary mt-2">برای ارسال رزومه وارد حساب کارجو شوید.</p><Link href="/login/candidate" className={buttonClassNames({ className: "mt-4 w-full" })}>ورود به حساب کارجو</Link></> : null}
                 {applicationEligibility === "resume-required" ? <><p className="text-secondary mt-2">برای ارسال درخواست ابتدا رزومه خود را تکمیل کنید.</p><Link href="/candidate/resume" className={buttonClassNames({ className: "mt-4 w-full" })}>تکمیل رزومه</Link></> : null}
                 {applicationEligibility === "already-applied" ? <><p className="mt-2 font-semibold text-success">درخواست شما ارسال شده است.</p><Link href="/candidate/applications" className={buttonClassNames({ variant: "secondary", className: "mt-4 w-full" })}>مشاهده درخواست‌های من</Link></> : null}
-                {applicationEligibility === "eligible" ? <><p className="text-secondary mt-2">رزومه فعلی جاب یوتی شما برای این فرصت ارسال می‌شود.</p><form action={applyToJob} className="mt-4"><input type="hidden" name="jobPostId" value={job.id} /><Button type="submit" className="w-full">ارسال رزومه</Button></form></> : null}
+                {applicationEligibility === "eligible" ? <><p className="text-secondary mt-2">رزومه فعلی شما در شبکه استخدامی متخصصین آکادمیک برای این فرصت ارسال می‌شود.</p><form action={applyToJob} className="mt-4"><input type="hidden" name="jobPostId" value={job.id} /><Button type="submit" className="w-full">ارسال رزومه</Button></form></> : null}
                 {applicationEligibility === "job-unavailable" ? <p className="text-secondary mt-2">این آگهی دیگر فعال نیست.</p> : null}
               </Card>
 
-              <Link href="/jobs" className={buttonClassNames({ variant: "secondary", className: "w-full" })}>مشاهده سایر فرصت‌ها</Link>
+              <Link href="/jobs" className={buttonClassNames({ variant: "secondary", className: "w-full" })}>مشاهده سایر آگهی‌ها</Link>
             </aside>
           </div>
         </Container>

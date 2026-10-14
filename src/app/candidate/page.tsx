@@ -20,11 +20,11 @@ export default async function CandidateDashboardPage() {
         <div className="max-w-3xl">
           <p className="text-meta">پنل کارجو</p>
           <h1 className="text-page-title mt-2">خوش آمدید</h1>
-          <p className="text-secondary mt-3">از این بخش می‌توانید فرصت‌های شغلی فعال جاب یوتی را مشاهده کنید.</p>
+          <p className="text-secondary mt-3">از این بخش می‌توانید آگهی‌های فعال شبکه استخدامی متخصصین آکادمیک را مشاهده کنید.</p>
           <Card className="mt-8 shadow-none">
-            <h2 className="text-card-title">فرصت‌های شغلی</h2>
+            <h2 className="text-card-title">آگهی‌ها</h2>
             <p className="text-secondary mt-2">مشاهده فرصت‌ها برای همه کاربران آزاد است و به ورود نیاز ندارد.</p>
-            <Link href="/jobs" className={buttonClassNames({ className: "mt-5" })}>مشاهده فرصت‌های شغلی</Link>
+            <Link href="/jobs" className={buttonClassNames({ className: "mt-5" })}>مشاهده آگهی‌ها</Link>
           </Card>
           <Card className="mt-4 shadow-none">
             <h2 className="text-card-title">رزومه</h2>

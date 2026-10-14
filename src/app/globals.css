@@ -10,6 +10,7 @@
   --color-ui-border: var(--border);
   --color-action: var(--action-primary);
   --color-action-hover: var(--action-primary-hover);
+  --color-accent: var(--brand-accent);
   --color-danger: var(--destructive);
   --color-danger-hover: var(--destructive-hover);
   --color-success: var(--success);
@@ -20,22 +21,24 @@
 }
 
 :root {
-  --page-background: #f7f8f8;
+  --page-background: #ffffff;
   --surface: #ffffff;
-  --surface-elevated: #fbfcfc;
-  --text-primary: #17211d;
-  --text-secondary: #47534e;
-  --text-muted: #6d7773;
-  --border: #dce2df;
-  --action-primary: #176b4b;
-  --action-primary-hover: #12583d;
+  --surface-elevated: #f6f7ff;
+  --text-primary: #11194f;
+  --text-secondary: #41486f;
+  --text-muted: #697096;
+  --border: #dfe2f2;
+  --action-primary: #142191;
+  --action-primary-hover: #0f196f;
+  --brand-accent: #f07925;
   --destructive: #b42318;
   --destructive-hover: #912018;
   --success: #18794e;
-  --warning: #9a6700;
-  --focus-ring: #25855f;
+  --warning: #b65312;
+  --focus-ring: #142191;
 
   --font-ui: Tahoma, Arial, "Segoe UI", sans-serif;
+  --font-brand: var(--font-ui);
   --layout-content: 72rem;
   --layout-dashboard: 90rem;
   --page-padding: 1rem;
@@ -142,5 +145,9 @@
     color: var(--text-muted);
     font-size: 0.75rem;
     line-height: 1.5;
+  }
+
+  .font-brand {
+    font-family: var(--font-brand);
   }
 }

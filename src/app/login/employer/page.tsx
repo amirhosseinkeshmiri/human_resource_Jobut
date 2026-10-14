@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getCurrentEmployer } from "@/auth/session";
+import { BrandLogo } from "@/components/brand/brand-logo";
 import { EmployerLoginForm } from "@/components/auth/employer-login-form";
 import { Card, Container } from "@/components/ui";
 
@@ -16,6 +17,7 @@ export default async function EmployerLoginPage() {
     <main className="grid min-h-screen place-items-center py-10">
       <Container>
         <Card className="mx-auto max-w-md">
+          <BrandLogo className="mx-auto mb-6 w-24" />
           <div className="mb-7">
             <p className="text-meta">ورود امن و بدون رمز عبور</p>
             <h1 className="text-section-title mt-2">ورود کارفرما</h1>

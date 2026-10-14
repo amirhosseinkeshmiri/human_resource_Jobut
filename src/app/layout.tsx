@@ -4,10 +4,10 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: {
-    default: "جاب‌اوت",
-    template: "%s | جاب‌اوت",
+    default: "شبکه استخدامی متخصصین آکادمیک",
+    template: "%s | شبکه استخدامی متخصصین آکادمیک",
   },
-  description: "جاب‌اوت؛ فضایی ساده برای نزدیک‌تر شدن کارجوها و فرصت‌های شغلی مرتبط.",
+  description: "شبکه استخدامی متخصصین آکادمیک؛ همراه شما در جذب و استخدام.",
 };
 
 export default function RootLayout({ children }: Readonly<{ children: ReactNode }>) {

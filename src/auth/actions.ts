@@ -1,7 +1,6 @@
 "use server";
 
-import { randomUUID } from "node:crypto";
-import { and, eq, isNull } from "drizzle-orm";
+import { and, desc, eq, isNull, sql } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import { db } from "@/db";
 import {
@@ -11,17 +10,22 @@ import {
 } from "@/db/schema";
 import {
   MAX_VERIFICATION_ATTEMPTS,
-  VERIFICATION_CODE_TTL_MINUTES,
   getChallengeAvailability,
 } from "./challenge-policy";
 import {
   digestVerificationCode,
-  generateVerificationCode,
   getAuthSecret,
   verificationCodeMatches,
 } from "./crypto";
-import { deliverVerificationCode, hasDevelopmentDelivery } from "./delivery";
+import { hasDevelopmentDelivery } from "./delivery";
+import { isBoundedAuthFormData } from "./form-security";
 import { normalizeEmployerIdentifier, normalizeVerificationCode } from "./identifier";
+import {
+  ChallengeCooldownError,
+  isWithinVerificationCodeCooldown,
+  issueVerificationChallenge,
+} from "./issue-challenge";
+import { isTrustedAuthActionRequest } from "./request-security";
 import {
   destroyEmployerSession,
   setEmployerSessionCookie,
@@ -45,6 +49,12 @@ export async function requestEmployerVerificationCode(
   _previousState: RequestCodeState,
   formData: FormData,
 ): Promise<RequestCodeState> {
+  if (!(await isTrustedAuthActionRequest())) {
+    return { status: "error", message: "درخواست ارسال کد معتبر نیست." };
+  }
+  if (!isBoundedAuthFormData(formData, ["identifier"])) {
+    return { status: "error", message: "درخواست ارسال کد معتبر نیست." };
+  }
   const rawIdentifier = formData.get("identifier");
   const identifier = normalizeEmployerIdentifier(
     typeof rawIdentifier === "string" ? rawIdentifier : "",
@@ -57,45 +67,89 @@ export async function requestEmployerVerificationCode(
     };
   }
 
-  if (!hasDevelopmentDelivery()) {
+  if (identifier.type === "email" && !hasDevelopmentDelivery()) {
     return {
       status: "error",
       message: "ارسال کد ورود هنوز برای محیط اصلی پیکربندی نشده است.",
     };
   }
 
-  const challengeId = randomUUID();
-  const code = generateVerificationCode();
-  const expiresAt = new Date(Date.now() + VERIFICATION_CODE_TTL_MINUTES * 60 * 1000);
-  const codeDigest = digestVerificationCode(challengeId, code, getAuthSecret());
-
-  await db.transaction(async (transaction) => {
-    await transaction
-      .update(employerAuthChallenges)
-      .set({ consumedAt: new Date() })
-      .where(
-        and(
-          eq(employerAuthChallenges.identifier, identifier.value),
-          isNull(employerAuthChallenges.consumedAt),
-        ),
-      );
-
-    await transaction.insert(employerAuthChallenges).values({
-      id: challengeId,
-      identifier: identifier.value,
-      identifierType: identifier.type,
-      codeDigest,
-      expiresAt,
+  let issued;
+  try {
+    issued = await issueVerificationChallenge(identifier, {
+      reserve: async ({ id, pendingDigest, pendingExpiresAt }) => {
+        await db.transaction(async (transaction) => {
+          await transaction.execute(
+            sql`select pg_advisory_xact_lock(hashtextextended(${`employer-auth:${identifier.value}`}, 0))`,
+          );
+          const [latest] = await transaction
+            .select({ createdAt: employerAuthChallenges.createdAt })
+            .from(employerAuthChallenges)
+            .where(eq(employerAuthChallenges.identifier, identifier.value))
+            .orderBy(desc(employerAuthChallenges.createdAt))
+            .limit(1);
+          if (latest && isWithinVerificationCodeCooldown(latest.createdAt)) {
+            throw new ChallengeCooldownError();
+          }
+          await transaction
+            .update(employerAuthChallenges)
+            .set({ consumedAt: new Date() })
+            .where(
+              and(
+                eq(employerAuthChallenges.identifier, identifier.value),
+                isNull(employerAuthChallenges.consumedAt),
+              ),
+            );
+          await transaction.insert(employerAuthChallenges).values({
+            id,
+            identifier: identifier.value,
+            identifierType: identifier.type,
+            codeDigest: pendingDigest,
+            expiresAt: pendingExpiresAt,
+          });
+        });
+      },
+      activate: async ({ id, codeDigest, expiresAt }) => {
+        return db.transaction(async (transaction) => {
+          await transaction.execute(
+            sql`select pg_advisory_xact_lock(hashtextextended(${`employer-auth:${identifier.value}`}, 0))`,
+          );
+          const [activated] = await transaction
+            .update(employerAuthChallenges)
+            .set({ codeDigest, expiresAt, attempts: 0 })
+            .where(
+              and(
+                eq(employerAuthChallenges.id, id),
+                eq(employerAuthChallenges.identifier, identifier.value),
+                isNull(employerAuthChallenges.consumedAt),
+              ),
+            )
+            .returning({ id: employerAuthChallenges.id });
+          return Boolean(activated);
+        });
+      },
+      invalidate: async (id) => {
+        await db
+          .update(employerAuthChallenges)
+          .set({ consumedAt: new Date() })
+          .where(and(eq(employerAuthChallenges.id, id), isNull(employerAuthChallenges.consumedAt)));
+      },
     });
-  });
-
-  const delivery = await deliverVerificationCode(identifier, code);
+  } catch (error) {
+    return {
+      status: "error",
+      message:
+        error instanceof ChallengeCooldownError
+          ? "برای دریافت کد جدید کمی صبر کنید."
+          : "ارسال پیامک کد ورود انجام نشد. دوباره تلاش کنید.",
+    };
+  }
 
   return {
     status: "challenge",
-    challengeId,
+    challengeId: issued.challengeId,
     identifier: identifier.value,
-    developmentCode: delivery.developmentCode,
+    developmentCode: issued.developmentCode,
   };
 }
 
@@ -103,6 +157,9 @@ export async function verifyEmployerCode(
   _previousState: VerifyCodeState,
   formData: FormData,
 ): Promise<VerifyCodeState> {
+  if (!isBoundedAuthFormData(formData, ["challengeId", "code"])) {
+    return { status: "error", message: "درخواست ورود معتبر نیست. دوباره تلاش کنید." };
+  }
   const challengeId = formData.get("challengeId");
   const code = normalizeVerificationCode(formData.get("code"));
 

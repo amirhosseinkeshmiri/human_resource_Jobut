@@ -12,6 +12,7 @@
     "test:onboarding": "NODE_OPTIONS=--conditions=react-server tsx --test src/onboarding/validation.test.ts",
     "test:packages": "tsx --test src/packages/purchase-policy.test.ts",
     "test:payments": "NODE_OPTIONS=--conditions=react-server tsx --test src/payments/payment.test.ts",
+    "test:sms": "NODE_OPTIONS=--conditions=react-server tsx --test src/auth/sms/melipayamak.test.ts",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:seed": "tsx src/db/seed/industries.ts"

@@ -6,6 +6,8 @@ import {
   verificationCodeMatches,
 } from "./crypto";
 import { normalizeEmployerIdentifier } from "./identifier";
+import { isBoundedAuthFormData } from "./form-security";
+import { isExpectedAuthOrigin } from "./origin-policy";
 import { createEmployerSessionMaterial } from "./session-material";
 
 test("normalizes employer emails", () => {
@@ -55,4 +57,29 @@ test("creates high-entropy session material with aligned expiry", () => {
   assert.equal(session.record.tokenDigest.length, 64);
   assert.equal(session.record.employerAccountId, "account-id");
   assert.ok(session.record.expiresAt > now);
+});
+
+test("auth forms reject extra fields and bodies larger than two kilobytes", () => {
+  const valid = new FormData();
+  valid.set("identifier", "09121234567");
+  assert.equal(isBoundedAuthFormData(valid, ["identifier"]), true);
+
+  valid.set("amount", "1");
+  assert.equal(isBoundedAuthFormData(valid, ["identifier"]), false);
+
+  const oversized = new FormData();
+  oversized.set("identifier", "x".repeat(2049));
+  assert.equal(isBoundedAuthFormData(oversized, ["identifier"]), false);
+});
+
+test("production auth origin must match the canonical HTTPS APP_URL", () => {
+  assert.equal(
+    isExpectedAuthOrigin("https://www.jobut.ir", "https://www.jobut.ir"),
+    true,
+  );
+  assert.equal(
+    isExpectedAuthOrigin("https://evil.example", "https://www.jobut.ir"),
+    false,
+  );
+  assert.equal(isExpectedAuthOrigin("http://localhost:3000", "http://localhost:3000"), false);
 });
