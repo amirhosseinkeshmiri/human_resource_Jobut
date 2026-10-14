@@ -101,7 +101,7 @@ export default async function JobPage({ params, searchParams }: JobPageProps) {
         )}
       </Card>
       <Card className="mt-4 shadow-none">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"><div><h2 className="text-card-title">رزومه‌های دریافتی</h2><p className="text-secondary mt-2">{applicationCount.toLocaleString("fa-IR")} درخواست برای این آگهی</p></div>{applicationCount > 0 ? <Link href={`/employer/jobs/${job.id}/applications`} className={buttonClassNames({ variant: "secondary", className: "w-full sm:w-auto" })}>مشاهده درخواست‌ها</Link> : null}</div>
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"><div><h2 className="text-card-title">رزومه‌های دریافتی</h2><p className="text-secondary mt-2">{applicationCount.toLocaleString("fa-IR")} درخواست برای این آگهی</p></div><div className="flex flex-col gap-2 sm:items-end"><Link href={`/employer/jobs/${job.id}/pipeline`} className={buttonClassNames({ className: "w-full sm:w-auto" })}>مشاهده پایپ‌لاین استخدام</Link><Link href={`/employer/jobs/${job.id}/applications`} className={buttonClassNames({ variant: "secondary", className: "w-full sm:w-auto" })}>مشاهده درخواست‌ها</Link></div></div>
       </Card>
       {job.status === "draft" ? (
         <Card className="mt-4 shadow-none">
