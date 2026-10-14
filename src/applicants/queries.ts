@@ -1,5 +1,6 @@
 import "server-only";
 import { and, asc, count, desc, eq } from "drizzle-orm";
+import { APPLICATION_STATUSES, type ApplicationStatusFilter } from "@/applications/status-policy";
 import { db } from "@/db";
 import {
   candidateResumes,
@@ -15,16 +16,30 @@ import {
   isRouteId,
 } from "./policy";
 
-export async function getEmployerJobApplicants(companyId: string, jobId: string, requestedPage: number) {
+export async function getEmployerJobApplicants(
+  companyId: string,
+  jobId: string,
+  requestedPage: number,
+  statusFilter: ApplicationStatusFilter,
+) {
   if (!isRouteId(jobId)) return null;
   const [job] = await db.select({ id: jobPosts.id, title: jobPosts.title, status: jobPosts.status })
     .from(jobPosts).where(and(eq(jobPosts.id, jobId), eq(jobPosts.companyId, companyId))).limit(1);
   if (!job) return null;
 
-  const [totalRow] = await db.select({ value: count() }).from(jobApplications)
-    .where(eq(jobApplications.jobPostId, job.id));
-  const pageCount = getApplicantPageCount(totalRow.value);
+  const countRows = await db.select({ status: jobApplications.status, value: count() })
+    .from(jobApplications)
+    .where(eq(jobApplications.jobPostId, job.id))
+    .groupBy(jobApplications.status);
+  const statusCounts = Object.fromEntries(APPLICATION_STATUSES.map((status) => [status, 0])) as Record<(typeof APPLICATION_STATUSES)[number], number>;
+  for (const row of countRows) statusCounts[row.status] = row.value;
+  const allCount = Object.values(statusCounts).reduce((sum, value) => sum + value, 0);
+  const total = statusFilter === "all" ? allCount : statusCounts[statusFilter];
+  const pageCount = getApplicantPageCount(total);
   const page = Math.min(requestedPage, pageCount);
+  const listCondition = statusFilter === "all"
+    ? eq(jobApplications.jobPostId, job.id)
+    : and(eq(jobApplications.jobPostId, job.id), eq(jobApplications.status, statusFilter));
   const applications = await db.select({
     applicationId: jobApplications.id,
     firstName: candidateResumes.firstName,
@@ -32,21 +47,23 @@ export async function getEmployerJobApplicants(companyId: string, jobId: string,
     professionalTitle: candidateResumes.professionalTitle,
     city: candidateResumes.city,
     skills: candidateResumes.skills,
+    status: jobApplications.status,
     createdAt: jobApplications.createdAt,
   }).from(jobApplications)
     .innerJoin(candidateResumes, eq(jobApplications.candidateResumeId, candidateResumes.id))
-    .where(eq(jobApplications.jobPostId, job.id))
+    .where(listCondition)
     .orderBy(desc(jobApplications.createdAt), desc(jobApplications.id))
     .limit(EMPLOYER_APPLICANTS_PAGE_SIZE)
     .offset((page - 1) * EMPLOYER_APPLICANTS_PAGE_SIZE);
 
-  return { job, applications, total: totalRow.value, page, pageCount };
+  return { job, applications, total, allCount, statusCounts, statusFilter, page, pageCount };
 }
 
 export async function getEmployerApplicantResume(companyId: string, jobId: string, applicationId: string) {
   if (!isRouteId(jobId) || !isRouteId(applicationId)) return null;
   const [result] = await db.select({
     applicationId: jobApplications.id,
+    applicationStatus: jobApplications.status,
     applicationCreatedAt: jobApplications.createdAt,
     jobId: jobPosts.id,
     jobTitle: jobPosts.title,

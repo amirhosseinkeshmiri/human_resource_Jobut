@@ -53,7 +53,7 @@ test("Candidate plus Job is the idempotency and concurrency key", () => {
 test("browser supplies only Job ID while Candidate and Resume are server-derived", () => {
   assert.deepEqual(APPLICATION_BROWSER_FIELDS, ["jobPostId"]);
   assert.deepEqual(buildApplicationInsert("candidate-a", "resume-a", "job-a"), {
-    candidateAccountId: "candidate-a", candidateResumeId: "resume-a", jobPostId: "job-a",
+    candidateAccountId: "candidate-a", candidateResumeId: "resume-a", jobPostId: "job-a", status: "received",
   });
 });
 
@@ -71,6 +71,6 @@ test("historical Application remains when its Job expires", () => {
   assert.equal(isPublicJobActive({ ...activeJob, expiresAt: now }, now), false);
 });
 
-test("JobApplication has no ATS status or speculative fields", () => {
-  assert.deepEqual(JOB_APPLICATION_FIELDS, ["id", "candidateAccountId", "candidateResumeId", "jobPostId", "createdAt"]);
+test("JobApplication adds only the minimal ATS status field", () => {
+  assert.deepEqual(JOB_APPLICATION_FIELDS, ["id", "candidateAccountId", "candidateResumeId", "jobPostId", "status", "createdAt"]);
 });

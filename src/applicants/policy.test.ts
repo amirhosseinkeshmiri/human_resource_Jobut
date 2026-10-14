@@ -31,7 +31,7 @@ test("closed, expired-published, and draft Jobs remain reviewable without public
 });
 
 test("Applicant list exposes summary Resume fields without Candidate identifiers", () => {
-  assert.deepEqual(APPLICANT_LIST_FIELDS, ["applicationId", "firstName", "lastName", "professionalTitle", "city", "skills", "createdAt"]);
+  assert.deepEqual(APPLICANT_LIST_FIELDS, ["applicationId", "firstName", "lastName", "professionalTitle", "city", "skills", "status", "createdAt"]);
   assert.equal(APPLICANT_LIST_FIELDS.some((field) => String(field).includes("candidate")), false);
 });
 
@@ -53,7 +53,7 @@ test("Applicant pagination is positive and bounded to twenty rows", () => {
   assert.equal(getApplicantPageCount(21), 2);
 });
 
-test("Employer Applicant foundation exposes no mutation or ATS capability", () => {
-  assert.deepEqual(EMPLOYER_APPLICANT_CAPABILITIES, ["list", "view"]);
+test("Employer Applicant capabilities add only status transition", () => {
+  assert.deepEqual(EMPLOYER_APPLICANT_CAPABILITIES, ["list", "view", "transition-status"]);
   assert.equal(EMPLOYER_RESUME_FIELDS.includes("status" as never), false);
 });

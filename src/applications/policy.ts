@@ -1,8 +1,9 @@
 import { isPublicJobActive, type PublicJobVisibilityInput } from "@/jobs/public-policy";
+import { DEFAULT_APPLICATION_STATUS } from "./status-policy";
 
 export type ApplicationEligibility = "login-required" | "resume-required" | "job-unavailable" | "already-applied" | "eligible";
 
-export const JOB_APPLICATION_FIELDS = ["id", "candidateAccountId", "candidateResumeId", "jobPostId", "createdAt"] as const;
+export const JOB_APPLICATION_FIELDS = ["id", "candidateAccountId", "candidateResumeId", "jobPostId", "status", "createdAt"] as const;
 export const APPLICATION_BROWSER_FIELDS = ["jobPostId"] as const;
 
 export function getApplicationEligibility(input: {
@@ -27,7 +28,7 @@ export function applicationUniquenessKey(candidateAccountId: string, jobPostId: 
 }
 
 export function buildApplicationInsert(candidateAccountId: string, candidateResumeId: string, jobPostId: string) {
-  return { candidateAccountId, candidateResumeId, jobPostId };
+  return { candidateAccountId, candidateResumeId, jobPostId, status: DEFAULT_APPLICATION_STATUS };
 }
 
 export function shouldKeepApplicationInHistory() {

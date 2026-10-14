@@ -413,6 +413,14 @@ export const resumeLanguages = pgTable(
   ],
 );
 
+export const applicationStatus = pgEnum("application_status", [
+  "received",
+  "reviewing",
+  "interview",
+  "rejected",
+  "hired",
+]);
+
 export const jobApplications = pgTable(
   "job_applications",
   {
@@ -426,6 +434,7 @@ export const jobApplications = pgTable(
     jobPostId: uuid("job_post_id")
       .notNull()
       .references(() => jobPosts.id, { onDelete: "restrict" }),
+    status: applicationStatus("status").default("received").notNull(),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (table) => [

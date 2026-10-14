@@ -7,6 +7,7 @@ export const APPLICANT_LIST_FIELDS = [
   "professionalTitle",
   "city",
   "skills",
+  "status",
   "createdAt",
 ] as const;
 
@@ -24,7 +25,7 @@ export const EMPLOYER_RESUME_FIELDS = [
   "languages",
 ] as const;
 
-export const EMPLOYER_APPLICANT_CAPABILITIES = ["list", "view"] as const;
+export const EMPLOYER_APPLICANT_CAPABILITIES = ["list", "view", "transition-status"] as const;
 
 export function parseApplicantPage(value: string | string[] | undefined) {
   const raw = Array.isArray(value) ? value[0] : value;

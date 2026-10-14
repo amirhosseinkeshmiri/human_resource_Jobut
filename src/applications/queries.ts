@@ -24,10 +24,11 @@ export async function getCandidateApplications(candidateAccountId: string, now =
   const rows = await db.select({
     id: jobApplications.id,
     createdAt: jobApplications.createdAt,
+    applicationStatus: jobApplications.status,
     jobPostId: jobPosts.id,
     jobTitle: jobPosts.title,
     companyName: companies.name,
-    status: jobPosts.status,
+    jobStatus: jobPosts.status,
     publishedAt: jobPosts.publishedAt,
     expiresAt: jobPosts.expiresAt,
     isPublic: publicJobConditions(now).mapWith(Boolean),
