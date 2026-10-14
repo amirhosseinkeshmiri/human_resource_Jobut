@@ -143,6 +143,7 @@ export async function getEmployerApplicantResume(companyId: string, jobId: strin
   const [result] = await db.select({
     applicationId: jobApplications.id,
     applicationStatus: jobApplications.status,
+    employerNote: jobApplications.employerNote,
     applicationCreatedAt: jobApplications.createdAt,
     jobId: jobPosts.id,
     jobTitle: jobPosts.title,

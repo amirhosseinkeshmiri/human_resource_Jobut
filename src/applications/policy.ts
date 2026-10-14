@@ -3,8 +3,20 @@ import { DEFAULT_APPLICATION_STATUS } from "./status-policy";
 
 export type ApplicationEligibility = "login-required" | "resume-required" | "job-unavailable" | "already-applied" | "eligible";
 
-export const JOB_APPLICATION_FIELDS = ["id", "candidateAccountId", "candidateResumeId", "jobPostId", "status", "createdAt"] as const;
+export const JOB_APPLICATION_FIELDS = ["id", "candidateAccountId", "candidateResumeId", "jobPostId", "status", "employerNote", "createdAt"] as const;
 export const APPLICATION_BROWSER_FIELDS = ["jobPostId"] as const;
+export const CANDIDATE_APPLICATION_HISTORY_FIELDS = [
+  "id",
+  "createdAt",
+  "applicationStatus",
+  "jobPostId",
+  "jobTitle",
+  "companyName",
+  "jobStatus",
+  "publishedAt",
+  "expiresAt",
+  "isPublic",
+] as const;
 
 export function getApplicationEligibility(input: {
   authenticated: boolean;

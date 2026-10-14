@@ -71,6 +71,6 @@ test("historical Application remains when its Job expires", () => {
   assert.equal(isPublicJobActive({ ...activeJob, expiresAt: now }, now), false);
 });
 
-test("JobApplication adds only the minimal ATS status field", () => {
-  assert.deepEqual(JOB_APPLICATION_FIELDS, ["id", "candidateAccountId", "candidateResumeId", "jobPostId", "status", "createdAt"]);
+test("JobApplication contains only the approved ATS status and private Employer note additions", () => {
+  assert.deepEqual(JOB_APPLICATION_FIELDS, ["id", "candidateAccountId", "candidateResumeId", "jobPostId", "status", "employerNote", "createdAt"]);
 });

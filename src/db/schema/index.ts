@@ -435,6 +435,7 @@ export const jobApplications = pgTable(
       .notNull()
       .references(() => jobPosts.id, { onDelete: "restrict" }),
     status: applicationStatus("status").default("received").notNull(),
+    employerNote: text("employer_note"),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (table) => [

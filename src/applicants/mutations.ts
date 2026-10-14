@@ -5,6 +5,7 @@ import { db } from "@/db";
 import { jobApplications, jobPosts } from "@/db/schema";
 import type { ApplicationStatus } from "@/applications/status-policy";
 import { resolveApplicationTransition } from "@/applications/status-policy";
+import { buildEmployerNoteUpdate } from "./note-policy";
 
 export type ApplicationTransitionResult =
   | "updated"
@@ -46,4 +47,35 @@ export async function transitionEmployerApplicationStatus(input: {
     .returning({ id: jobApplications.id });
 
   return updated.length === 1 ? "updated" : "stale";
+}
+
+export async function updateEmployerApplicationNote(input: {
+  companyId: string;
+  jobId: string;
+  applicationId: string;
+  employerNote: string | null;
+}) {
+  const [ownedApplication] = await db
+    .select({ id: jobApplications.id })
+    .from(jobApplications)
+    .innerJoin(jobPosts, eq(jobApplications.jobPostId, jobPosts.id))
+    .where(and(
+      eq(jobApplications.id, input.applicationId),
+      eq(jobApplications.jobPostId, input.jobId),
+      eq(jobPosts.companyId, input.companyId),
+    ))
+    .limit(1);
+
+  if (!ownedApplication) return "not-found" as const;
+
+  const updated = await db
+    .update(jobApplications)
+    .set(buildEmployerNoteUpdate(input.employerNote))
+    .where(and(
+      eq(jobApplications.id, ownedApplication.id),
+      eq(jobApplications.jobPostId, input.jobId),
+    ))
+    .returning({ id: jobApplications.id });
+
+  return updated.length === 1 ? "updated" as const : "not-found" as const;
 }

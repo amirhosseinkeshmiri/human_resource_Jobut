@@ -32,7 +32,7 @@ test("published job without publication timestamps is not public", () => {
 test("public detail field allowlist contains no private Company or Employer data", () => {
   assert.equal(PUBLIC_JOB_DETAIL_FIELDS.includes("companyName"), true);
   assert.equal(PUBLIC_JOB_DETAIL_FIELDS.includes("companyLogoUrl"), true);
-  for (const privateField of ["companyId", "employerAccountId", "email", "mobile", "creditBalance", "packagePurchases"]) {
+  for (const privateField of ["companyId", "employerAccountId", "email", "mobile", "employerNote", "creditBalance", "packagePurchases"]) {
     assert.equal((PUBLIC_JOB_DETAIL_FIELDS as readonly string[]).includes(privateField), false);
   }
 });
