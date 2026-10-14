@@ -43,7 +43,7 @@ test("formats negotiable and bounded salary in Persian", () => {
 });
 
 test("enum presentation mappings use the approved Persian labels", () => {
-  assert.deepEqual(workplaceTypeLabels, { onsite: "حضوری", remote: "دورکاری", hybrid: "هیبرید" });
+  assert.deepEqual(workplaceTypeLabels, { onsite: "حضوری", remote: "دورکاری", hybrid: "ترکیبی" });
   assert.deepEqual(employmentTypeLabels, { full_time: "تمام‌وقت", part_time: "پاره‌وقت", project: "پروژه‌ای", internship: "کارآموزی" });
   assert.deepEqual(seniorityLevelLabels, { intern: "کارآموز", junior: "جونیور", mid_level: "میدل‌لول", senior: "سنیور", lead: "لید" });
 });

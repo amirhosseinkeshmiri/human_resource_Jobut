@@ -7,7 +7,7 @@ export const seniorityLevels = ["intern", "junior", "mid_level", "senior", "lead
 export const workplaceTypeLabels = {
   onsite: "حضوری",
   remote: "دورکاری",
-  hybrid: "هیبرید",
+  hybrid: "ترکیبی",
 } as const;
 
 export const employmentTypeLabels = {
