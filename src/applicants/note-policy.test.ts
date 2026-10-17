@@ -48,5 +48,6 @@ test("note persistence replaces or clears only employerNote", () => {
 
 test("Candidate Application history cannot expose Employer notes", () => {
   assert.equal((CANDIDATE_APPLICATION_HISTORY_FIELDS as readonly string[]).includes("employerNote"), false);
+  assert.equal((CANDIDATE_APPLICATION_HISTORY_FIELDS as readonly string[]).includes("statusHistory"), false);
   assert.equal((CANDIDATE_APPLICATION_HISTORY_FIELDS as readonly string[]).includes("applicationStatus"), true);
 });

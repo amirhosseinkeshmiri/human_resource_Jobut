@@ -5,6 +5,7 @@ import { db } from "@/db";
 import {
   candidateResumes,
   jobApplications,
+  jobApplicationStatusHistory,
   jobPosts,
   resumeEducations,
   resumeExperiences,
@@ -21,6 +22,7 @@ import {
   isPipelineTruncated,
   type PipelineApplication,
 } from "./pipeline-policy";
+import { APPLICATION_STATUS_HISTORY_LIMIT } from "@/applications/status-history-policy";
 
 export async function getEmployerJobPipeline(companyId: string, jobId: string) {
   if (!isRouteId(jobId)) return null;
@@ -167,16 +169,25 @@ export async function getEmployerApplicantResume(companyId: string, jobId: strin
     )).limit(1);
   if (!result) return null;
 
-  const [experiences, educations, languages] = await Promise.all([
+  const [experiences, educations, languages, statusHistory] = await Promise.all([
     db.select({ jobTitle: resumeExperiences.jobTitle, companyName: resumeExperiences.companyName, startDate: resumeExperiences.startDate, endDate: resumeExperiences.endDate, isCurrent: resumeExperiences.isCurrent, description: resumeExperiences.description })
       .from(resumeExperiences).where(eq(resumeExperiences.resumeId, result.resumeId)).orderBy(asc(resumeExperiences.sortOrder)),
     db.select({ fieldOfStudy: resumeEducations.fieldOfStudy, institutionName: resumeEducations.institutionName, degree: resumeEducations.degree, startDate: resumeEducations.startDate, endDate: resumeEducations.endDate, isCurrent: resumeEducations.isCurrent })
       .from(resumeEducations).where(eq(resumeEducations.resumeId, result.resumeId)).orderBy(asc(resumeEducations.sortOrder)),
     db.select({ name: resumeLanguages.name, proficiency: resumeLanguages.proficiency })
       .from(resumeLanguages).where(eq(resumeLanguages.resumeId, result.resumeId)).orderBy(asc(resumeLanguages.sortOrder)),
+    db.select({
+      id: jobApplicationStatusHistory.id,
+      fromStatus: jobApplicationStatusHistory.fromStatus,
+      toStatus: jobApplicationStatusHistory.toStatus,
+      changedAt: jobApplicationStatusHistory.changedAt,
+    }).from(jobApplicationStatusHistory)
+      .where(eq(jobApplicationStatusHistory.jobApplicationId, result.applicationId))
+      .orderBy(asc(jobApplicationStatusHistory.changedAt), asc(jobApplicationStatusHistory.id))
+      .limit(APPLICATION_STATUS_HISTORY_LIMIT),
   ]);
 
-  return { ...result, experiences, educations, languages };
+  return { ...result, experiences, educations, languages, statusHistory };
 }
 
 export async function getJobApplicationCount(companyId: string, jobId: string) {

@@ -62,7 +62,7 @@ test("draft, closed, and expired-published Job histories remain reviewable", () 
 
 test("pipeline selects summary Resume fields without Candidate auth identifiers", () => {
   assert.deepEqual(PIPELINE_APPLICATION_FIELDS, ["applicationId", "firstName", "lastName", "professionalTitle", "city", "skills", "status", "createdAt"]);
-  for (const privateField of ["candidateAccountId", "candidateResumeId", "email", "mobile", "employerNote", "professionalSummary", "experiences", "educations", "languages"]) {
+  for (const privateField of ["candidateAccountId", "candidateResumeId", "email", "mobile", "employerNote", "statusHistory", "professionalSummary", "experiences", "educations", "languages"]) {
     assert.equal((PIPELINE_APPLICATION_FIELDS as readonly string[]).includes(privateField), false);
   }
 });

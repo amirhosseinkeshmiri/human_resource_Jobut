@@ -446,6 +446,25 @@ export const jobApplications = pgTable(
   ],
 );
 
+export const jobApplicationStatusHistory = pgTable(
+  "job_application_status_history",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    jobApplicationId: uuid("job_application_id")
+      .notNull()
+      .references(() => jobApplications.id, { onDelete: "restrict" }),
+    fromStatus: applicationStatus("from_status").notNull(),
+    toStatus: applicationStatus("to_status").notNull(),
+    changedAt: timestamp("changed_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("job_application_status_history_application_changed_idx").on(
+      table.jobApplicationId,
+      table.changedAt,
+    ),
+  ],
+);
+
 export const candidateIdentifierType = pgEnum("candidate_identifier_type", ["email", "mobile"]);
 
 export const candidateAuthChallenges = pgTable(
