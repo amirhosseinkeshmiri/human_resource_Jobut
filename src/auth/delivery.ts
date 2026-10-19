@@ -27,12 +27,11 @@ export function resolveVerificationDeliveryMode(
 
 export async function deliverVerificationCode(
   identifier: AuthIdentifier,
-  developmentCode: string | null,
-): Promise<{ code: string; developmentCode?: string }> {
+  verificationCode: string,
+): Promise<{ developmentCode?: string }> {
   const mode = resolveVerificationDeliveryMode(identifier);
   if (mode === "development") {
-    if (!developmentCode) throw new VerificationDeliveryError();
-    return { code: developmentCode, developmentCode };
+    return { developmentCode: verificationCode };
   }
 
   if (mode !== "melipayamak") {
@@ -40,7 +39,8 @@ export async function deliverVerificationCode(
   }
 
   try {
-    return { code: await sendMeliPayamakOtp(identifier.value) };
+    await sendMeliPayamakOtp(identifier.value, verificationCode);
+    return {};
   } catch {
     throw new VerificationDeliveryError();
   }

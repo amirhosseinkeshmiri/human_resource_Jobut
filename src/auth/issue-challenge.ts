@@ -2,7 +2,7 @@ import "server-only";
 import { randomBytes, randomUUID } from "node:crypto";
 import { VERIFICATION_CODE_TTL_MINUTES } from "./challenge-policy";
 import { digestVerificationCode, generateVerificationCode, getAuthSecret } from "./crypto";
-import { deliverVerificationCode, hasDevelopmentDelivery } from "./delivery";
+import { deliverVerificationCode } from "./delivery";
 import type { AuthIdentifier } from "./identifier";
 
 export const VERIFICATION_CODE_RESEND_COOLDOWN_SECONDS = 60;
@@ -43,10 +43,10 @@ export async function issueVerificationChallenge(
   );
   await callbacks.reserve({ id, pendingDigest, pendingExpiresAt: new Date(0) });
 
-  const locallyGeneratedCode = hasDevelopmentDelivery() ? generateVerificationCode() : null;
+  const verificationCode = generateVerificationCode();
   try {
-    const delivery = await deliver(identifier, locallyGeneratedCode);
-    const codeDigest = digestVerificationCode(id, delivery.code, secret);
+    const delivery = await deliver(identifier, verificationCode);
+    const codeDigest = digestVerificationCode(id, verificationCode, secret);
     const activated = await callbacks.activate({
       id,
       codeDigest,

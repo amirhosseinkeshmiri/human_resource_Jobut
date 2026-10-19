@@ -23,13 +23,14 @@ export class SmsProviderError extends Error {
 
 export interface MeliPayamakConfig {
   endpoint: URL;
+  sender: string;
   timeoutMs: number;
 }
 
 export function loadMeliPayamakConfig(
   environment: Record<string, string | undefined> = process.env,
 ): MeliPayamakConfig {
-  const rawEndpoint = environment.MELIPAYAMAK_JOBUT_OTP_ENDPOINT?.trim();
+  const rawEndpoint = environment.MELIPAYAMAK_SIMPLE_ENDPOINT?.trim();
   if (!rawEndpoint) throw new SmsProviderError("configuration");
 
   let endpoint: URL;
@@ -50,6 +51,11 @@ export function loadMeliPayamakConfig(
     throw new SmsProviderError("configuration");
   }
 
+  const sender = environment.MELIPAYAMAK_FROM?.trim();
+  if (!sender || !/^[0-9]{3,32}$/.test(sender)) {
+    throw new SmsProviderError("configuration");
+  }
+
   const rawTimeout = environment.SMS_TIMEOUT_MS?.trim();
   const timeoutMs = rawTimeout ? Number(rawTimeout) : DEFAULT_TIMEOUT_MS;
   if (
@@ -59,7 +65,7 @@ export function loadMeliPayamakConfig(
   ) {
     throw new SmsProviderError("configuration");
   }
-  return { endpoint, timeoutMs };
+  return { endpoint, sender, timeoutMs };
 }
 
 export function toMeliPayamakPhone(canonicalMobile: string) {
@@ -104,18 +110,26 @@ async function readBoundedBody(response: Response) {
 
 export async function sendMeliPayamakOtp(
   canonicalMobile: string,
+  verificationCode: string,
   fetchImplementation: typeof fetch = fetch,
   environment: Record<string, string | undefined> = process.env,
 ) {
   const config = loadMeliPayamakConfig(environment);
+  if (!/^[0-9]{6}$/.test(verificationCode)) {
+    throw new SmsProviderError("configuration");
+  }
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), config.timeoutMs);
   let response: Response;
   try {
     response = await fetchImplementation(config.endpoint, {
       method: "POST",
-      headers: { accept: "application/json", "content-type": "application/json" },
-      body: JSON.stringify({ to: toMeliPayamakPhone(canonicalMobile) }),
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        from: config.sender,
+        to: toMeliPayamakPhone(canonicalMobile),
+        text: `کد ورود به JOBUT: ${verificationCode}`,
+      }),
       redirect: "error",
       cache: "no-store",
       signal: controller.signal,
@@ -147,9 +161,9 @@ export async function sendMeliPayamakOtp(
   if (!body || typeof body !== "object" || Array.isArray(body)) {
     throw new SmsProviderError("invalid_response");
   }
-  const code = (body as { code?: unknown }).code;
-  if (typeof code !== "string" || !/^[0-9]{6}$/.test(code)) {
+  const { recId, status } = body as { recId?: unknown; status?: unknown };
+  if (typeof recId !== "number" || !Number.isFinite(recId) || typeof status !== "string") {
     throw new SmsProviderError("invalid_response");
   }
-  return code;
+  return { recId, status };
 }

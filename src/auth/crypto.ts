@@ -14,7 +14,14 @@ export function getAuthSecret() {
 }
 
 export function generateVerificationCode() {
-  return randomInt(0, 10 ** OTP_LENGTH).toString().padStart(OTP_LENGTH, "0");
+  return formatVerificationCode(randomInt(0, 10 ** OTP_LENGTH));
+}
+
+export function formatVerificationCode(value: number) {
+  if (!Number.isInteger(value) || value < 0 || value >= 10 ** OTP_LENGTH) {
+    throw new Error("verification_code_random_value_out_of_range");
+  }
+  return value.toString().padStart(OTP_LENGTH, "0");
 }
 
 export function digestVerificationCode(challengeId: string, code: string, secret: string) {
