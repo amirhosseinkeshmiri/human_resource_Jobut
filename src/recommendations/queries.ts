@@ -24,6 +24,8 @@ function enumMatch(column: SQLWrapper, values: readonly string[]): SQL<boolean> 
   return values.length ? sql<boolean>`${column} in (${sqlList(values)})` : sql<boolean>`false`;
 }
 
+export type CandidateRecommendationProfile = NonNullable<Awaited<ReturnType<typeof getCandidateRecommendationProfile>>>;
+
 export type CandidateRecommendationData =
   | { state: "no-resume"; recommendations: [] }
   | { state: "no-skills"; recommendations: [] }
@@ -40,6 +42,7 @@ async function queryRecommendations(
     preferredSeniorityLevels: string[];
   },
   now: Date,
+  limit: number,
 ) {
   const normalizedSkills = [...new Set(profile.skills.map(normalizeText))];
   const normalizedLocations = [...new Set(profile.preferredLocations.map(normalizeText))];
@@ -120,16 +123,19 @@ async function queryRecommendations(
       sql`(${skillCount} >= 1 or ${explicitPreferenceMatches} >= 2)`,
     ))
     .orderBy(desc(score), desc(skillCount), desc(jobPosts.publishedAt), asc(jobPosts.id))
-    .limit(RECOMMENDATION_LIMIT);
+    .limit(Math.max(1, Math.min(limit, RECOMMENDATION_LIMIT)));
 }
 
-export async function getCandidateRecommendedJobs(
-  candidateAccountId: string,
-  now = new Date(),
-): Promise<CandidateRecommendationData> {
+export async function getCandidateRecommendationProfile(candidateAccountId: string) {
   const [profile] = await db.select({
+    firstName: candidateResumes.firstName,
+    lastName: candidateResumes.lastName,
     city: candidateResumes.city,
+    professionalTitle: candidateResumes.professionalTitle,
+    professionalSummary: candidateResumes.professionalSummary,
     skills: candidateResumes.skills,
+    linkedinUrl: candidateResumes.linkedinUrl,
+    portfolioUrl: candidateResumes.portfolioUrl,
     preferredLocations: candidateJobPreferences.preferredLocations,
     preferredWorkplaceTypes: candidateJobPreferences.preferredWorkplaceTypes,
     preferredEmploymentTypes: candidateJobPreferences.preferredEmploymentTypes,
@@ -142,17 +148,36 @@ export async function getCandidateRecommendedJobs(
     .where(eq(candidateResumes.candidateAccountId, candidateAccountId))
     .limit(1);
 
-  if (!profile) return { state: "no-resume", recommendations: [] };
-  if (profile.skills.length === 0) return { state: "no-skills", recommendations: [] };
-
-  const recommendations = await queryRecommendations(candidateAccountId, {
-    city: profile.city,
-    skills: profile.skills,
+  if (!profile) return null;
+  return {
+    ...profile,
     preferredLocations: profile.preferredLocations ?? [],
     preferredWorkplaceTypes: profile.preferredWorkplaceTypes ?? [],
     preferredEmploymentTypes: profile.preferredEmploymentTypes ?? [],
     preferredSeniorityLevels: profile.preferredSeniorityLevels ?? [],
-  }, now);
+  };
+}
+
+export async function getRecommendedJobsForProfile(
+  candidateAccountId: string,
+  profile: CandidateRecommendationProfile,
+  now = new Date(),
+  limit = RECOMMENDATION_LIMIT,
+) {
+  if (profile.skills.length === 0) return [];
+  return queryRecommendations(candidateAccountId, profile, now, limit);
+}
+
+export async function getCandidateRecommendedJobs(
+  candidateAccountId: string,
+  now = new Date(),
+): Promise<CandidateRecommendationData> {
+  const profile = await getCandidateRecommendationProfile(candidateAccountId);
+
+  if (!profile) return { state: "no-resume", recommendations: [] };
+  if (profile.skills.length === 0) return { state: "no-skills", recommendations: [] };
+
+  const recommendations = await getRecommendedJobsForProfile(candidateAccountId, profile, now);
 
   return { state: "ready", recommendations };
 }
