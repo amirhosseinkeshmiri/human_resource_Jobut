@@ -32,6 +32,11 @@ export default async function CandidateDashboardPage() {
             <Link href="/candidate/resume" className={buttonClassNames({ variant: hasResume ? "secondary" : "primary", className: "mt-5" })}>{hasResume ? "مشاهده و ویرایش رزومه" : "ساخت رزومه"}</Link>
           </Card>
           <Card className="mt-4 shadow-none">
+            <h2 className="text-card-title">ترجیحات شغلی</h2>
+            <p className="text-secondary mt-2">محل، نحوه حضور، نوع همکاری و سطح شغلی دلخواه خود را برای پیشنهادهای بهتر ثبت کنید.</p>
+            <Link href="/candidate/preferences" className={buttonClassNames({ variant: "secondary", className: "mt-5" })}>تکمیل یا ویرایش ترجیحات</Link>
+          </Card>
+          <Card className="mt-4 shadow-none">
             <h2 className="text-card-title">درخواست‌های ارسال‌شده</h2>
             <p className="mt-3 text-2xl font-bold">{applicationCount.toLocaleString("fa-IR")}</p>
             <Link href="/candidate/applications" className={buttonClassNames({ variant: "secondary", className: "mt-5" })}>مشاهده درخواست‌های من</Link>

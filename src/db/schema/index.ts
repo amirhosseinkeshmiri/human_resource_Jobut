@@ -325,6 +325,50 @@ export const candidateAccounts = pgTable(
   ],
 );
 
+export const candidateJobPreferences = pgTable(
+  "candidate_job_preferences",
+  {
+    candidateAccountId: uuid("candidate_account_id")
+      .primaryKey()
+      .references(() => candidateAccounts.id, { onDelete: "cascade" }),
+    preferredLocations: text("preferred_locations")
+      .array()
+      .default(sql`'{}'::text[]`)
+      .notNull(),
+    preferredWorkplaceTypes: workplaceType("preferred_workplace_types")
+      .array()
+      .default(sql`'{}'::workplace_type[]`)
+      .notNull(),
+    preferredEmploymentTypes: employmentType("preferred_employment_types")
+      .array()
+      .default(sql`'{}'::employment_type[]`)
+      .notNull(),
+    preferredSeniorityLevels: seniorityLevel("preferred_seniority_levels")
+      .array()
+      .default(sql`'{}'::seniority_level[]`)
+      .notNull(),
+    ...timestamps,
+  },
+  (table) => [
+    check(
+      "candidate_job_preferences_locations_count_check",
+      sql`cardinality(${table.preferredLocations}) <= 5`,
+    ),
+    check(
+      "candidate_job_preferences_workplace_count_check",
+      sql`cardinality(${table.preferredWorkplaceTypes}) <= 3`,
+    ),
+    check(
+      "candidate_job_preferences_employment_count_check",
+      sql`cardinality(${table.preferredEmploymentTypes}) <= 4`,
+    ),
+    check(
+      "candidate_job_preferences_seniority_count_check",
+      sql`cardinality(${table.preferredSeniorityLevels}) <= 5`,
+    ),
+  ],
+);
+
 export const resumeLanguageProficiency = pgEnum("resume_language_proficiency", [
   "basic",
   "intermediate",
@@ -505,7 +549,15 @@ export const candidateSessions = pgTable(
 export const candidateAccountRelations = relations(candidateAccounts, ({ one, many }) => ({
   sessions: many(candidateSessions),
   resume: one(candidateResumes),
+  jobPreferences: one(candidateJobPreferences),
   applications: many(jobApplications),
+}));
+
+export const candidateJobPreferenceRelations = relations(candidateJobPreferences, ({ one }) => ({
+  candidateAccount: one(candidateAccounts, {
+    fields: [candidateJobPreferences.candidateAccountId],
+    references: [candidateAccounts.id],
+  }),
 }));
 
 export const candidateResumeRelations = relations(candidateResumes, ({ one, many }) => ({
