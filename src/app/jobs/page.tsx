@@ -22,12 +22,13 @@ import {
   workplaceTypeLabels,
   workplaceTypes,
 } from "@/jobs/validation";
+import { PUBLIC_JOBS_LABEL } from "@/jobs/public-copy";
 
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "آگهی‌ها",
-  description: "آگهی‌های فعال در شبکه استخدامی متخصصین آکادمیک.",
+  title: PUBLIC_JOBS_LABEL,
+  description: "فرصت‌های شغلی فعال در شبکه استخدامی متخصصین آکادمیک.",
 };
 
 interface PageProps {
@@ -48,8 +49,8 @@ export default async function PublicJobsPage({ searchParams }: PageProps) {
         <section className="border-b border-ui-border bg-surface">
           <Container className="py-12 sm:py-16">
             <p className="text-meta text-accent">شبکه استخدامی متخصصین آکادمیک</p>
-            <h1 className="text-page-title mt-2">آگهی‌ها</h1>
-            <p className="text-secondary mt-3 max-w-2xl">آگهی‌های فعال را بر اساس عنوان، شرکت، شهر و شرایط همکاری پیدا کنید.</p>
+            <h1 className="text-page-title mt-2">{PUBLIC_JOBS_LABEL}</h1>
+            <p className="text-secondary mt-3 max-w-2xl">فرصت‌های شغلی فعال را بر اساس عنوان، شرکت، شهر و شرایط همکاری پیدا کنید.</p>
           </Container>
         </section>
 
@@ -81,31 +82,31 @@ export default async function PublicJobsPage({ searchParams }: PageProps) {
                 </Select>
               </FormField>
               <div className="flex flex-col gap-2 sm:flex-row lg:col-span-4">
-                <Button type="submit" className="w-full sm:w-auto">جست‌وجوی آگهی‌ها</Button>
+                <Button type="submit" className="w-full sm:w-auto">جست‌وجوی فرصت‌ها</Button>
                 {filtered ? <Link href={PUBLIC_JOBS_CLEAR_URL} className={buttonClassNames({ variant: "secondary", className: "w-full sm:w-auto" })}>پاک کردن فیلترها</Link> : null}
               </div>
             </form>
           </Card>
 
           <div className="mt-7 flex flex-wrap items-center justify-between gap-3">
-            <p className="text-secondary">{numberFormatter.format(total)} آگهی پیدا شد</p>
+            <p className="text-secondary">{numberFormatter.format(total)} فرصت شغلی پیدا شد</p>
             {pageCount > 1 ? <p className="text-helper">صفحه {numberFormatter.format(page)} از {numberFormatter.format(pageCount)}</p> : null}
           </div>
 
           {jobs.length > 0 ? (
-            <section aria-label="فهرست آگهی‌ها" className="mt-5 grid gap-4 md:grid-cols-2">
+            <section aria-label="فهرست فرصت‌های شغلی" className="mt-5 grid gap-4 md:grid-cols-2">
               {jobs.map((job) => <PublicJobCard key={job.id} job={job} />)}
             </section>
           ) : (
             <Card className="mt-5 text-center shadow-none">
-              <h2 className="text-card-title">{filtered ? "آگهی‌ای با این فیلترها پیدا نشد" : "در حال حاضر آگهی فعالی وجود ندارد"}</h2>
-              <p className="text-secondary mt-2">{filtered ? "فیلترها را تغییر دهید یا پاک کنید." : "آگهی‌های فعال پس از انتشار در این بخش نمایش داده می‌شوند."}</p>
+              <h2 className="text-card-title">{filtered ? "فرصت شغلی‌ای با این فیلترها پیدا نشد" : "در حال حاضر فرصت شغلی فعالی وجود ندارد"}</h2>
+              <p className="text-secondary mt-2">{filtered ? "فیلترها را تغییر دهید یا پاک کنید." : "فرصت‌های فعال پس از انتشار در این بخش نمایش داده می‌شوند."}</p>
               {filtered ? <Link href={PUBLIC_JOBS_CLEAR_URL} className={buttonClassNames({ variant: "secondary", className: "mt-5" })}>پاک کردن فیلترها</Link> : null}
             </Card>
           )}
 
           {pageCount > 1 ? (
-            <nav aria-label="صفحه‌بندی آگهی‌ها" className="mt-7 flex items-center justify-between gap-3">
+            <nav aria-label="صفحه‌بندی فرصت‌های شغلی" className="mt-7 flex items-center justify-between gap-3">
               {page > 1 ? <Link href={buildPublicJobsHref(filters, page - 1)} className={buttonClassNames({ variant: "secondary", size: "small" })}>صفحه قبل</Link> : <span />}
               <span className="text-sm text-text-secondary">صفحه {numberFormatter.format(page)} از {numberFormatter.format(pageCount)}</span>
               {page < pageCount ? <Link href={buildPublicJobsHref(filters, page + 1)} className={buttonClassNames({ variant: "secondary", size: "small" })}>صفحه بعد</Link> : <span />}

@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { buttonClassNames } from "@/components/ui/button";
 import { classNames } from "@/lib/class-names";
+import { PUBLIC_JOBS_LABEL, PUBLIC_JOBS_ROUTE } from "@/jobs/public-copy";
 
 interface NavigationItem {
   label: string;
@@ -14,7 +15,7 @@ interface NavigationItem {
 
 const navigationItems: readonly NavigationItem[] = [
   { label: "خانه", href: "/", activePath: "/" },
-  { label: "آگهی‌ها", href: "/jobs", activePath: "/jobs" },
+  { label: PUBLIC_JOBS_LABEL, href: PUBLIC_JOBS_ROUTE, activePath: PUBLIC_JOBS_ROUTE },
   { label: "خدمات ما", href: "/#services" },
   { label: "درباره ما", href: "/#about" },
 ];

@@ -104,7 +104,7 @@ export default function Home() {
                 <h1 id="hero-title" className="font-brand mt-2 text-[clamp(1.55rem,3.5vw,3.25rem)] font-bold leading-[1.3] text-action">همراه شما در جذب و استخدام</h1>
                 <div className="mt-4 flex flex-col justify-center gap-2 sm:flex-row lg:justify-start">
                   <Link href="#contact" className={buttonClassNames({ size: "small" })}>درخواست همکاری</Link>
-                  <Link href="/jobs" className={buttonClassNames({ variant: "secondary", size: "small" })}>مشاهده آگهی‌ها</Link>
+                  <Link href="/jobs" className={buttonClassNames({ variant: "secondary", size: "small" })}>مشاهده فرصت‌های شغلی</Link>
                 </div>
               </div>
             </Container>

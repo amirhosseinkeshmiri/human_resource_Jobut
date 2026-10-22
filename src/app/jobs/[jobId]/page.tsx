@@ -23,7 +23,7 @@ interface PublicJobPageProps {
 export async function generateMetadata({ params }: PublicJobPageProps): Promise<Metadata> {
   const { jobId } = await params;
   const job = await getPublicJobById(jobId);
-  if (!job) return { title: "آگهی پیدا نشد" };
+  if (!job) return { title: "فرصت شغلی پیدا نشد" };
 
   return {
     title: `${job.title} در ${job.companyName}`,
@@ -50,7 +50,7 @@ export default async function PublicJobPage({ params }: PublicJobPageProps) {
       <PublicHeader />
       <main>
         <Container className="py-8 sm:py-12">
-          <Link href="/jobs" className="text-sm font-semibold text-action outline-none hover:text-action-hover focus-visible:rounded focus-visible:ring-2 focus-visible:ring-focus/30">بازگشت به آگهی‌ها</Link>
+          <Link href="/jobs" className="text-sm font-semibold text-action outline-none hover:text-action-hover focus-visible:rounded focus-visible:ring-2 focus-visible:ring-focus/30">بازگشت به فرصت‌های شغلی</Link>
 
           <div className="mt-6 grid gap-5 lg:grid-cols-[minmax(0,1fr)_18rem] lg:items-start">
             <article className="grid gap-5">
@@ -108,7 +108,7 @@ export default async function PublicJobPage({ params }: PublicJobPageProps) {
                 {applicationEligibility === "job-unavailable" ? <p className="text-secondary mt-2">این آگهی دیگر فعال نیست.</p> : null}
               </Card>
 
-              <Link href="/jobs" className={buttonClassNames({ variant: "secondary", className: "w-full" })}>مشاهده سایر آگهی‌ها</Link>
+              <Link href="/jobs" className={buttonClassNames({ variant: "secondary", className: "w-full" })}>مشاهده سایر فرصت‌های شغلی</Link>
             </aside>
           </div>
         </Container>

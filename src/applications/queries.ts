@@ -27,6 +27,7 @@ export async function getCandidateApplications(candidateAccountId: string, now =
     applicationStatus: jobApplications.status,
     jobPostId: jobPosts.id,
     jobTitle: jobPosts.title,
+    jobLocation: jobPosts.location,
     companyName: companies.name,
     jobStatus: jobPosts.status,
     publishedAt: jobPosts.publishedAt,

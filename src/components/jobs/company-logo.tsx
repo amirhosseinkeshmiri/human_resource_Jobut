@@ -1,3 +1,5 @@
+import { getCompanyLogoFallback } from "@/jobs/card-presentation";
+
 interface CompanyLogoProps {
   companyName: string;
   logoUrl: string | null;
@@ -21,7 +23,7 @@ export function CompanyLogo({ companyName, logoUrl, size = "small" }: CompanyLog
 
   return (
     <span aria-hidden="true" className={`${sizeClass} grid shrink-0 place-items-center rounded-lg border bg-surface-elevated font-bold text-action`}>
-      {companyName.trim().charAt(0) || "ج"}
+      {getCompanyLogoFallback(companyName)}
     </span>
   );
 }

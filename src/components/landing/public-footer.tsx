@@ -1,12 +1,13 @@
 import Link from "next/link";
 import { BrandLogo } from "@/components/brand/brand-logo";
 import { Container } from "@/components/ui/container";
+import { PUBLIC_JOBS_LABEL, PUBLIC_JOBS_ROUTE } from "@/jobs/public-copy";
 
 const quickLinks = [
   ["خدمات ما", "/#services"],
   ["تعرفه‌ها", "/#pricing"],
   ["درباره ما", "/#about"],
-  ["آگهی‌ها", "/jobs"],
+  [PUBLIC_JOBS_LABEL, PUBLIC_JOBS_ROUTE],
   ["ارتباط با ما", "/#contact"],
 ];
 
