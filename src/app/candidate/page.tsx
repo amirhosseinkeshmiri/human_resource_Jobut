@@ -27,6 +27,11 @@ export default async function CandidateDashboardPage() {
             <Link href="/jobs" className={buttonClassNames({ className: "mt-5" })}>مشاهده آگهی‌ها</Link>
           </Card>
           <Card className="mt-4 shadow-none">
+            <h2 className="text-card-title">آگهی‌های پیشنهادی</h2>
+            <p className="text-secondary mt-2">آگهی‌های متناسب با مهارت‌های رزومه و ترجیحات شغلی شما را ببینید.</p>
+            <Link href="/candidate/recommended-jobs" className={buttonClassNames({ variant: "secondary", className: "mt-5" })}>مشاهده پیشنهادها</Link>
+          </Card>
+          <Card className="mt-4 shadow-none">
             <h2 className="text-card-title">رزومه</h2>
             <p className="text-secondary mt-2">{hasResume ? "رزومه تکمیل شده و آماده ویرایش است." : "رزومه تکمیل نشده است."}</p>
             <Link href="/candidate/resume" className={buttonClassNames({ variant: hasResume ? "secondary" : "primary", className: "mt-5" })}>{hasResume ? "مشاهده و ویرایش رزومه" : "ساخت رزومه"}</Link>
