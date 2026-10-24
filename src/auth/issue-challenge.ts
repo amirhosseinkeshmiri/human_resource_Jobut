@@ -20,6 +20,7 @@ export class ChallengeCooldownError extends Error {
 }
 
 interface IssueChallengeCallbacks {
+  authorize?(): Promise<void>;
   reserve(input: {
     id: string;
     pendingDigest: string;
@@ -45,6 +46,7 @@ export async function issueVerificationChallenge(
 
   const verificationCode = generateVerificationCode();
   try {
+    await callbacks.authorize?.();
     const delivery = await deliver(identifier, verificationCode);
     const codeDigest = digestVerificationCode(id, verificationCode, secret);
     const activated = await callbacks.activate({

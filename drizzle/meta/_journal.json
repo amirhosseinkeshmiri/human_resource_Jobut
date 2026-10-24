@@ -99,6 +99,27 @@
       "when": 1792651399568,
       "tag": "0013_regular_silvermane",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1792821284946,
+      "tag": "0014_sms_rate_limits",
+      "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "7",
+      "when": 1792823017346,
+      "tag": "0015_application_resume_snapshots",
+      "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1792824429462,
+      "tag": "0016_application_messaging",
+      "breakpoints": true
     }
   ]
 }

@@ -6,18 +6,13 @@ import { db } from "@/db";
 import { candidateAccounts, candidateSessions } from "@/db/schema";
 import { digestSessionToken } from "@/auth/crypto";
 import { CANDIDATE_SESSION_COOKIE } from "@/auth/session-cookies";
+import { sessionCookieOptions } from "@/auth/session-cookie-options";
 
 export { CANDIDATE_SESSION_COOKIE } from "@/auth/session-cookies";
 
 export async function setCandidateSessionCookie(token: string, expiresAt: Date) {
   const cookieStore = await cookies();
-  cookieStore.set(CANDIDATE_SESSION_COOKIE, token, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    path: "/",
-    expires: expiresAt,
-  });
+  cookieStore.set(CANDIDATE_SESSION_COOKIE, token, sessionCookieOptions(expiresAt));
 }
 
 export async function getCurrentCandidate() {
@@ -55,11 +50,5 @@ export async function destroyCandidateSession() {
       .where(eq(candidateSessions.tokenDigest, digestSessionToken(token)));
   }
 
-  cookieStore.set(CANDIDATE_SESSION_COOKIE, "", {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    path: "/",
-    expires: new Date(0),
-  });
+  cookieStore.set(CANDIDATE_SESSION_COOKIE, "", sessionCookieOptions(new Date(0)));
 }

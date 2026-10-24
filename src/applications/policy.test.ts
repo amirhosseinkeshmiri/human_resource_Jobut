@@ -3,6 +3,7 @@ import test from "node:test";
 import { isPublicJobActive } from "@/jobs/public-policy";
 import { isStoredResumeComplete } from "@/resume/policy";
 import {
+  APPLICATION_RESUME_SNAPSHOT_FIELDS,
   APPLICATION_BROWSER_FIELDS,
   JOB_APPLICATION_FIELDS,
   applicationUniquenessKey,
@@ -73,4 +74,14 @@ test("historical Application remains when its Job expires", () => {
 
 test("JobApplication contains only the approved ATS status and private Employer note additions", () => {
   assert.deepEqual(JOB_APPLICATION_FIELDS, ["id", "candidateAccountId", "candidateResumeId", "jobPostId", "status", "employerNote", "createdAt"]);
+});
+
+test("snapshot content excludes account and authentication data", () => {
+  assert.deepEqual(APPLICATION_RESUME_SNAPSHOT_FIELDS, [
+    "firstName", "lastName", "city", "professionalTitle", "professionalSummary",
+    "skills", "linkedinUrl", "portfolioUrl", "experiences", "educations", "languages",
+  ]);
+  for (const field of ["candidateAccountId", "mobile", "email", "password", "otp", "sessionToken"]) {
+    assert.equal((APPLICATION_RESUME_SNAPSHOT_FIELDS as readonly string[]).includes(field), false);
+  }
 });

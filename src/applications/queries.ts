@@ -1,7 +1,15 @@
 import "server-only";
-import { and, count, desc, eq } from "drizzle-orm";
+import { and, asc, count, desc, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { companies, jobApplications, jobPosts } from "@/db/schema";
+import {
+  applicationResumeSnapshotEducations,
+  applicationResumeSnapshotExperiences,
+  applicationResumeSnapshotLanguages,
+  applicationResumeSnapshots,
+  companies,
+  jobApplications,
+  jobPosts,
+} from "@/db/schema";
 import { publicJobConditions } from "@/jobs/public-queries";
 import { getCandidateResume } from "@/resume/queries";
 import { isStoredResumeComplete } from "@/resume/policy";
@@ -32,15 +40,52 @@ export async function getCandidateApplications(candidateAccountId: string, now =
     jobStatus: jobPosts.status,
     publishedAt: jobPosts.publishedAt,
     expiresAt: jobPosts.expiresAt,
+    snapshotAvailable: sql<boolean>`${applicationResumeSnapshots.jobApplicationId} is not null`,
     isPublic: publicJobConditions(now).mapWith(Boolean),
   }).from(jobApplications)
     .innerJoin(jobPosts, eq(jobApplications.jobPostId, jobPosts.id))
     .innerJoin(companies, eq(jobPosts.companyId, companies.id))
+    .leftJoin(applicationResumeSnapshots, eq(jobApplications.id, applicationResumeSnapshots.jobApplicationId))
     .where(eq(jobApplications.candidateAccountId, candidateAccountId))
     .orderBy(desc(jobApplications.createdAt))
     .limit(50);
 
   return rows;
+}
+
+export async function getCandidateApplicationResumeSnapshot(
+  candidateAccountId: string,
+  applicationId: string,
+) {
+  const [application] = await db.select({
+    applicationId: jobApplications.id,
+    applicationCreatedAt: jobApplications.createdAt,
+    jobTitle: jobPosts.title,
+    companyName: companies.name,
+    snapshotApplicationId: applicationResumeSnapshots.jobApplicationId,
+    capturedAt: applicationResumeSnapshots.capturedAt,
+    firstName: applicationResumeSnapshots.firstName,
+    lastName: applicationResumeSnapshots.lastName,
+    city: applicationResumeSnapshots.city,
+    professionalTitle: applicationResumeSnapshots.professionalTitle,
+    professionalSummary: applicationResumeSnapshots.professionalSummary,
+    skills: applicationResumeSnapshots.skills,
+    linkedinUrl: applicationResumeSnapshots.linkedinUrl,
+    portfolioUrl: applicationResumeSnapshots.portfolioUrl,
+  }).from(jobApplications)
+    .innerJoin(jobPosts, eq(jobApplications.jobPostId, jobPosts.id))
+    .innerJoin(companies, eq(jobPosts.companyId, companies.id))
+    .leftJoin(applicationResumeSnapshots, eq(jobApplications.id, applicationResumeSnapshots.jobApplicationId))
+    .where(and(eq(jobApplications.id, applicationId), eq(jobApplications.candidateAccountId, candidateAccountId)))
+    .limit(1);
+  if (!application) return null;
+
+  const [experiences, educations, languages] = await Promise.all([
+    db.select({ jobTitle: applicationResumeSnapshotExperiences.jobTitle, companyName: applicationResumeSnapshotExperiences.companyName, startDate: applicationResumeSnapshotExperiences.startDate, endDate: applicationResumeSnapshotExperiences.endDate, isCurrent: applicationResumeSnapshotExperiences.isCurrent, description: applicationResumeSnapshotExperiences.description }).from(applicationResumeSnapshotExperiences).where(eq(applicationResumeSnapshotExperiences.jobApplicationId, applicationId)).orderBy(asc(applicationResumeSnapshotExperiences.sortOrder)),
+    db.select({ fieldOfStudy: applicationResumeSnapshotEducations.fieldOfStudy, institutionName: applicationResumeSnapshotEducations.institutionName, degree: applicationResumeSnapshotEducations.degree, startDate: applicationResumeSnapshotEducations.startDate, endDate: applicationResumeSnapshotEducations.endDate, isCurrent: applicationResumeSnapshotEducations.isCurrent }).from(applicationResumeSnapshotEducations).where(eq(applicationResumeSnapshotEducations.jobApplicationId, applicationId)).orderBy(asc(applicationResumeSnapshotEducations.sortOrder)),
+    db.select({ name: applicationResumeSnapshotLanguages.name, proficiency: applicationResumeSnapshotLanguages.proficiency }).from(applicationResumeSnapshotLanguages).where(eq(applicationResumeSnapshotLanguages.jobApplicationId, applicationId)).orderBy(asc(applicationResumeSnapshotLanguages.sortOrder)),
+  ]);
+  return { ...application, snapshotAvailable: application.snapshotApplicationId !== null, experiences, educations, languages };
 }
 
 export async function countCandidateApplications(candidateAccountId: string) {

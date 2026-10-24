@@ -2,6 +2,7 @@ export const EMPLOYER_APPLICANTS_PAGE_SIZE = 20;
 
 export const APPLICANT_LIST_FIELDS = [
   "applicationId",
+  "snapshotAvailable",
   "firstName",
   "lastName",
   "professionalTitle",

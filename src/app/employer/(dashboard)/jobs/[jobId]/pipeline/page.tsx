@@ -64,13 +64,25 @@ export default async function EmployerJobPipelinePage({ params }: PageProps) {
                     <Link
                       href={pipelineApplicationDetailHref(pipeline.job.id, application.applicationId)}
                       className="block min-h-11 rounded-md border border-ui-border bg-surface p-3 outline-none transition-colors hover:border-action/30 hover:bg-surface-elevated focus-visible:ring-2 focus-visible:ring-focus/30"
-                      aria-label={`مشاهده درخواست ${application.firstName} ${application.lastName}`}
+                      aria-label={application.snapshotAvailable
+                        ? `مشاهده درخواست ${application.firstName} ${application.lastName}`
+                        : "مشاهده درخواست قدیمی"}
                     >
-                      <h3 className="text-sm font-bold text-text-primary">{application.firstName} {application.lastName}</h3>
-                      <p className="mt-1 text-sm font-semibold text-action">{application.professionalTitle}</p>
-                      <p className="text-helper mt-1">{application.city}</p>
+                      <h3 className="text-sm font-bold text-text-primary">
+                        {application.snapshotAvailable
+                          ? `${application.firstName} ${application.lastName}`
+                          : "درخواست قدیمی"}
+                      </h3>
+                      {application.snapshotAvailable ? (
+                        <>
+                          <p className="mt-1 text-sm font-semibold text-action">{application.professionalTitle}</p>
+                          <p className="text-helper mt-1">{application.city}</p>
+                        </>
+                      ) : (
+                        <p className="text-helper mt-1">رزومه تاریخی در دسترس نیست.</p>
+                      )}
                       <p className="text-helper mt-3">ارسال‌شده در {dateFormatter.format(application.createdAt)}</p>
-                      {application.skills.length ? (
+                      {application.skills?.length ? (
                         <div className="mt-3 flex flex-wrap gap-1.5" aria-label="مهارت‌های منتخب">
                           {application.skills.slice(0, 3).map((skill) => <Badge key={skill}>{skill}</Badge>)}
                           {application.skills.length > 3 ? <Badge>+{numberFormatter.format(application.skills.length - 3)}</Badge> : null}

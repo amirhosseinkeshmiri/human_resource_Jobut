@@ -19,11 +19,10 @@ import {
   toMeliPayamakPhone,
 } from "./melipayamak";
 
-const endpoint = "https://console.melipayamak.com/api/send/simple/jobut-secret";
-const sender = "500012345";
+const endpoint = "https://console.melipayamak.com/api/send/shared/jobut-secret";
 const providerEnvironment = {
-  MELIPAYAMAK_SIMPLE_ENDPOINT: endpoint,
-  MELIPAYAMAK_FROM: sender,
+  MELIPAYAMAK_SHARED_ENDPOINT: endpoint,
+  MELIPAYAMAK_BODY_ID: "561397",
   SMS_TIMEOUT_MS: "5000",
 };
 
@@ -31,16 +30,28 @@ function assertCategory(category: string) {
   return (error: unknown) => error instanceof SmsProviderError && error.category === category;
 }
 
-test("production provider requires the secret simple endpoint and sender", () => {
+test("production provider requires the secret shared endpoint and positive body ID", () => {
   assert.throws(() => loadMeliPayamakConfig({}), assertCategory("configuration"));
   assert.throws(
-    () => loadMeliPayamakConfig({ MELIPAYAMAK_SIMPLE_ENDPOINT: endpoint }),
+    () => loadMeliPayamakConfig({ MELIPAYAMAK_SHARED_ENDPOINT: endpoint }),
     assertCategory("configuration"),
   );
+  for (const bodyId of [undefined, "", "0", "-1", "1.5", "abc", "9007199254740992"]) {
+    assert.throws(
+      () => loadMeliPayamakConfig({ ...providerEnvironment, MELIPAYAMAK_BODY_ID: bodyId }),
+      assertCategory("configuration"),
+    );
+  }
   const config = loadMeliPayamakConfig(providerEnvironment);
   assert.equal(config.endpoint.toString(), endpoint);
-  assert.equal(config.sender, sender);
+  assert.equal(config.bodyId, 561397);
   assert.equal(config.timeoutMs, 5000);
+
+  const configWithoutObsoleteVariables = loadMeliPayamakConfig({
+    MELIPAYAMAK_SHARED_ENDPOINT: endpoint,
+    MELIPAYAMAK_BODY_ID: "561397",
+  });
+  assert.equal(configWithoutObsoleteVariables.bodyId, 561397);
 });
 
 test("production mobile delivery remains isolated from email and development", () => {
@@ -53,15 +64,17 @@ test("production mobile delivery remains isolated from email and development", (
 
 test("endpoint validation rejects insecure, foreign, credential, query, fragment, and port URLs", () => {
   for (const invalidEndpoint of [
-    "http://console.melipayamak.com/api/send/simple/jobut",
-    "https://example.com/api/send/simple/jobut",
-    "https://user:pass@console.melipayamak.com/api/send/simple/jobut",
-    "https://console.melipayamak.com/api/send/simple/jobut?secret=x",
-    "https://console.melipayamak.com/api/send/simple/jobut#secret",
-    "https://console.melipayamak.com:8443/api/send/simple/jobut",
+    "http://console.melipayamak.com/api/send/shared/jobut",
+    "https://example.com/api/send/shared/jobut",
+    "https://user:pass@console.melipayamak.com/api/send/shared/jobut",
+    "https://console.melipayamak.com/api/send/shared/jobut?secret=x",
+    "https://console.melipayamak.com/api/send/shared/jobut#secret",
+    "https://console.melipayamak.com:8443/api/send/shared/jobut",
+    "https://console.melipayamak.com/api/send/simple/jobut",
+    "https://console.melipayamak.com/api/send/shared/",
   ]) {
     assert.throws(
-      () => loadMeliPayamakConfig({ ...providerEnvironment, MELIPAYAMAK_SIMPLE_ENDPOINT: invalidEndpoint }),
+      () => loadMeliPayamakConfig({ ...providerEnvironment, MELIPAYAMAK_SHARED_ENDPOINT: invalidEndpoint }),
       assertCategory("configuration"),
     );
   }
@@ -80,7 +93,7 @@ test("OTP generation is cryptographic, six-digit, and preserves leading zeroes",
   }
 });
 
-test("simple SMS request uses exact POST JSON and puts OTP only in text", async () => {
+test("shared-template SMS request uses exact POST JSON and preserves the OTP string", async () => {
   assert.equal(toMeliPayamakPhone("+989121234567"), "09121234567");
   let calls = 0;
   let requestInput: string | URL | Request | undefined;
@@ -103,9 +116,12 @@ test("simple SMS request uses exact POST JSON and puts OTP only in text", async 
   assert.equal(requestInit?.redirect, "error");
   assert.deepEqual(requestInit?.headers, { "content-type": "application/json" });
   const body = JSON.parse(String(requestInit?.body)) as Record<string, unknown>;
-  assert.deepEqual(body, { from: sender, to: "09121234567", text: "کد ورود به JOBUT: 042731" });
-  assert.deepEqual(Object.keys(body).sort(), ["from", "text", "to"]);
-  assert.equal(JSON.stringify({ from: body.from, to: body.to }).includes("042731"), false);
+  assert.deepEqual(body, { bodyId: 561397, to: "09121234567", args: ["042731"] });
+  assert.deepEqual(Object.keys(body).sort(), ["args", "bodyId", "to"]);
+  assert.equal(typeof (body.args as unknown[])[0], "string");
+  assert.equal("from" in body, false);
+  assert.equal("text" in body, false);
+  assert.equal(JSON.stringify(body).includes("a-development-test-secret-with-32-characters"), false);
 });
 
 test("provider response accepts only documented recId/status structure", async () => {

@@ -7,6 +7,7 @@ import { employerAccounts, employerSessions } from "@/db/schema";
 import { digestSessionToken } from "./crypto";
 import { createEmployerSessionMaterial } from "./session-material";
 import { EMPLOYER_SESSION_COOKIE } from "./session-cookies";
+import { sessionCookieOptions } from "./session-cookie-options";
 
 export { EMPLOYER_SESSION_COOKIE } from "./session-cookies";
 
@@ -18,13 +19,7 @@ export async function createEmployerSession(employerAccountId: string) {
 
 export async function setEmployerSessionCookie(token: string, expiresAt: Date) {
   const cookieStore = await cookies();
-  cookieStore.set(EMPLOYER_SESSION_COOKIE, token, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    path: "/",
-    expires: expiresAt,
-  });
+  cookieStore.set(EMPLOYER_SESSION_COOKIE, token, sessionCookieOptions(expiresAt));
 }
 
 export async function getCurrentEmployer() {
@@ -66,11 +61,5 @@ export async function destroyEmployerSession() {
       .where(eq(employerSessions.tokenDigest, digestSessionToken(token)));
   }
 
-  cookieStore.set(EMPLOYER_SESSION_COOKIE, "", {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    path: "/",
-    expires: new Date(0),
-  });
+  cookieStore.set(EMPLOYER_SESSION_COOKIE, "", sessionCookieOptions(new Date(0)));
 }

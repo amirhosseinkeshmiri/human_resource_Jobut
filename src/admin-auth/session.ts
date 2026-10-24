@@ -6,18 +6,13 @@ import { digestSessionToken } from "@/auth/crypto";
 import { ADMIN_SESSION_COOKIE } from "@/auth/session-cookies";
 import { db } from "@/db";
 import { adminAccounts, adminSessions } from "@/db/schema";
+import { sessionCookieOptions } from "@/auth/session-cookie-options";
 
 export { ADMIN_SESSION_COOKIE } from "@/auth/session-cookies";
 
 export async function setAdminSessionCookie(token: string, expiresAt: Date) {
   const cookieStore = await cookies();
-  cookieStore.set(ADMIN_SESSION_COOKIE, token, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    path: "/",
-    expires: expiresAt,
-  });
+  cookieStore.set(ADMIN_SESSION_COOKIE, token, sessionCookieOptions(expiresAt));
 }
 
 export async function getCurrentAdmin() {
@@ -53,11 +48,5 @@ export async function destroyAdminSession() {
     await db.delete(adminSessions).where(eq(adminSessions.tokenDigest, digestSessionToken(token)));
   }
 
-  cookieStore.set(ADMIN_SESSION_COOKIE, "", {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    path: "/",
-    expires: new Date(0),
-  });
+  cookieStore.set(ADMIN_SESSION_COOKIE, "", sessionCookieOptions(new Date(0)));
 }

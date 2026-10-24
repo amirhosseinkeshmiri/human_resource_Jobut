@@ -15,8 +15,27 @@ export const CANDIDATE_APPLICATION_HISTORY_FIELDS = [
   "jobStatus",
   "publishedAt",
   "expiresAt",
+  "snapshotAvailable",
   "isPublic",
 ] as const;
+
+export const APPLICATION_RESUME_SNAPSHOT_FIELDS = [
+  "firstName",
+  "lastName",
+  "city",
+  "professionalTitle",
+  "professionalSummary",
+  "skills",
+  "linkedinUrl",
+  "portfolioUrl",
+  "experiences",
+  "educations",
+  "languages",
+] as const;
+
+export function hasReliableResumeSnapshot(snapshotApplicationId: string | null) {
+  return snapshotApplicationId !== null;
+}
 
 export function getApplicationEligibility(input: {
   authenticated: boolean;

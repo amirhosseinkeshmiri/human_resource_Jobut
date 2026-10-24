@@ -22,6 +22,7 @@ import {
   issueVerificationChallenge,
 } from "@/auth/issue-challenge";
 import { isTrustedAuthActionRequest } from "@/auth/request-security";
+import { authorizeSmsChallenge } from "@/auth/sms/rate-limit";
 import { createCandidateSessionMaterial } from "@/auth/session-material";
 import { destroyCandidateSession, setCandidateSessionCookie } from "./session";
 
@@ -67,6 +68,7 @@ export async function requestCandidateVerificationCode(
   let issued;
   try {
     issued = await issueVerificationChallenge(identifier, {
+      authorize: () => authorizeSmsChallenge("candidate", identifier),
       reserve: async ({ id, pendingDigest, pendingExpiresAt }) => {
         await db.transaction(async (transaction) => {
           await transaction.execute(

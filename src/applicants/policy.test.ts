@@ -31,7 +31,7 @@ test("closed, expired-published, and draft Jobs remain reviewable without public
 });
 
 test("Applicant list exposes summary Resume fields without Candidate identifiers", () => {
-  assert.deepEqual(APPLICANT_LIST_FIELDS, ["applicationId", "firstName", "lastName", "professionalTitle", "city", "skills", "status", "createdAt"]);
+  assert.deepEqual(APPLICANT_LIST_FIELDS, ["applicationId", "snapshotAvailable", "firstName", "lastName", "professionalTitle", "city", "skills", "status", "createdAt"]);
   assert.equal(APPLICANT_LIST_FIELDS.some((field) => String(field).includes("candidate")), false);
   assert.equal((APPLICANT_LIST_FIELDS as readonly string[]).includes("statusHistory"), false);
 });

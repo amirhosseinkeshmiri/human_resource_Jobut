@@ -8,6 +8,7 @@ import { createAdminSessionMaterial, createCandidateSessionMaterial, createEmplo
 import { adminAccounts, adminSessions, candidateSessions, employerSessions } from "@/db/schema";
 import {
   adminDashboardMetricKeys,
+  canCreateAdminSession,
   canIssueAdminChallenge,
   deferredAdminMetrics,
   paidPurchaseRevenue,
@@ -34,6 +35,13 @@ test("Admin session uses a digest and thirty-day expiry", () => {
   assert.equal(session.record.adminAccountId, "admin-id");
   assert.equal(session.record.tokenDigest, digestSessionToken(session.token));
   assert.equal(session.record.expiresAt.toISOString(), "2026-01-31T00:00:00.000Z");
+});
+
+test("Admin session creation requires both a provisioned account and verified challenge", () => {
+  assert.equal(canCreateAdminSession("admin-id", true), true);
+  assert.equal(canCreateAdminSession("admin-id", false), false);
+  assert.equal(canCreateAdminSession(undefined, true), false);
+  assert.equal(canCreateAdminSession(null, false), false);
 });
 
 test("Admin cookie and session records are isolated from Employer and Candidate", () => {

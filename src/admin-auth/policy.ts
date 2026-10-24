@@ -2,6 +2,13 @@ export function canIssueAdminChallenge(adminAccountId: string | null | undefined
   return Boolean(adminAccountId);
 }
 
+export function canCreateAdminSession(
+  adminAccountId: string | null | undefined,
+  challengeVerified: boolean,
+) {
+  return Boolean(adminAccountId) && challengeVerified;
+}
+
 export function paidPurchaseRevenue(status: "pending" | "paid", priceToman: number) {
   return status === "paid" ? priceToman : 0;
 }

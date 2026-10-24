@@ -42,6 +42,24 @@ export const employerAccounts = pgTable(
 
 export const employerIdentifierType = pgEnum("employer_identifier_type", ["email", "mobile"]);
 
+export const smsRateLimits = pgTable(
+  "sms_rate_limits",
+  {
+    bucketKey: varchar("bucket_key", { length: 100 }).primaryKey(),
+    requestCount: integer("request_count").notNull(),
+    windowStartedAt: timestamp("window_started_at", { withTimezone: true }).notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  },
+  (table) => [
+    index("sms_rate_limits_expires_at_idx").on(table.expiresAt),
+    check("sms_rate_limits_request_count_check", sql`${table.requestCount} > 0`),
+    check(
+      "sms_rate_limits_window_check",
+      sql`${table.expiresAt} > ${table.windowStartedAt}`,
+    ),
+  ],
+);
+
 export const employerAuthChallenges = pgTable(
   "employer_auth_challenges",
   {
@@ -465,6 +483,21 @@ export const applicationStatus = pgEnum("application_status", [
   "hired",
 ]);
 
+export const applicationMessageSenderRole = pgEnum("application_message_sender_role", [
+  "employer",
+  "candidate",
+]);
+
+export const applicationMessageKind = pgEnum("application_message_kind", [
+  "recruitment_message",
+  "interview_invitation",
+]);
+
+export const applicationMessageEventType = pgEnum("application_message_event_type", [
+  "sent",
+  "read",
+]);
+
 export const jobApplications = pgTable(
   "job_applications",
   {
@@ -473,8 +506,7 @@ export const jobApplications = pgTable(
       .notNull()
       .references(() => candidateAccounts.id, { onDelete: "restrict" }),
     candidateResumeId: uuid("candidate_resume_id")
-      .notNull()
-      .references(() => candidateResumes.id, { onDelete: "restrict" }),
+      .references(() => candidateResumes.id, { onDelete: "set null" }),
     jobPostId: uuid("job_post_id")
       .notNull()
       .references(() => jobPosts.id, { onDelete: "restrict" }),
@@ -487,6 +519,106 @@ export const jobApplications = pgTable(
     index("job_applications_candidate_id_idx").on(table.candidateAccountId),
     index("job_applications_resume_id_idx").on(table.candidateResumeId),
     index("job_applications_job_id_idx").on(table.jobPostId),
+  ],
+);
+
+export const applicationResumeSnapshots = pgTable("application_resume_snapshots", {
+  jobApplicationId: uuid("job_application_id")
+    .primaryKey()
+    .references(() => jobApplications.id, { onDelete: "cascade" }),
+  firstName: varchar("first_name", { length: 100 }).notNull(),
+  lastName: varchar("last_name", { length: 120 }).notNull(),
+  city: varchar("city", { length: 160 }).notNull(),
+  professionalTitle: varchar("professional_title", { length: 160 }).notNull(),
+  professionalSummary: text("professional_summary").notNull(),
+  skills: text("skills").array().notNull(),
+  linkedinUrl: text("linkedin_url"),
+  portfolioUrl: text("portfolio_url"),
+  capturedAt: timestamp("captured_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const applicationResumeSnapshotExperiences = pgTable(
+  "application_resume_snapshot_experiences",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    jobApplicationId: uuid("job_application_id")
+      .notNull()
+      .references(() => applicationResumeSnapshots.jobApplicationId, { onDelete: "cascade" }),
+    jobTitle: varchar("job_title", { length: 160 }).notNull(),
+    companyName: varchar("company_name", { length: 200 }).notNull(),
+    startDate: date("start_date").notNull(),
+    endDate: date("end_date"),
+    isCurrent: boolean("is_current").notNull(),
+    description: text("description"),
+    sortOrder: integer("sort_order").notNull(),
+  },
+  (table) => [
+    unique("application_resume_snapshot_experiences_sort_unique").on(
+      table.jobApplicationId,
+      table.sortOrder,
+    ),
+    index("application_resume_snapshot_experiences_application_idx").on(
+      table.jobApplicationId,
+    ),
+    check("application_resume_snapshot_experiences_sort_check", sql`${table.sortOrder} >= 0`),
+    check(
+      "application_resume_snapshot_experiences_dates_check",
+      sql`(${table.isCurrent} = true and ${table.endDate} is null) or (${table.isCurrent} = false and ${table.endDate} is not null and ${table.endDate} >= ${table.startDate})`,
+    ),
+  ],
+);
+
+export const applicationResumeSnapshotEducations = pgTable(
+  "application_resume_snapshot_educations",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    jobApplicationId: uuid("job_application_id")
+      .notNull()
+      .references(() => applicationResumeSnapshots.jobApplicationId, { onDelete: "cascade" }),
+    fieldOfStudy: varchar("field_of_study", { length: 160 }).notNull(),
+    institutionName: varchar("institution_name", { length: 200 }).notNull(),
+    degree: varchar("degree", { length: 120 }).notNull(),
+    startDate: date("start_date").notNull(),
+    endDate: date("end_date"),
+    isCurrent: boolean("is_current").notNull(),
+    sortOrder: integer("sort_order").notNull(),
+  },
+  (table) => [
+    unique("application_resume_snapshot_educations_sort_unique").on(
+      table.jobApplicationId,
+      table.sortOrder,
+    ),
+    index("application_resume_snapshot_educations_application_idx").on(
+      table.jobApplicationId,
+    ),
+    check("application_resume_snapshot_educations_sort_check", sql`${table.sortOrder} >= 0`),
+    check(
+      "application_resume_snapshot_educations_dates_check",
+      sql`(${table.isCurrent} = true and ${table.endDate} is null) or (${table.isCurrent} = false and ${table.endDate} is not null and ${table.endDate} >= ${table.startDate})`,
+    ),
+  ],
+);
+
+export const applicationResumeSnapshotLanguages = pgTable(
+  "application_resume_snapshot_languages",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    jobApplicationId: uuid("job_application_id")
+      .notNull()
+      .references(() => applicationResumeSnapshots.jobApplicationId, { onDelete: "cascade" }),
+    name: varchar("name", { length: 100 }).notNull(),
+    proficiency: resumeLanguageProficiency("proficiency").notNull(),
+    sortOrder: integer("sort_order").notNull(),
+  },
+  (table) => [
+    unique("application_resume_snapshot_languages_sort_unique").on(
+      table.jobApplicationId,
+      table.sortOrder,
+    ),
+    index("application_resume_snapshot_languages_application_idx").on(
+      table.jobApplicationId,
+    ),
+    check("application_resume_snapshot_languages_sort_check", sql`${table.sortOrder} >= 0`),
   ],
 );
 
@@ -506,6 +638,64 @@ export const jobApplicationStatusHistory = pgTable(
       table.jobApplicationId,
       table.changedAt,
     ),
+  ],
+);
+
+export const applicationMessages = pgTable(
+  "application_messages",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    jobApplicationId: uuid("job_application_id")
+      .notNull()
+      .references(() => jobApplications.id, { onDelete: "cascade" }),
+    senderRole: applicationMessageSenderRole("sender_role").notNull(),
+    senderEmployerAccountId: uuid("sender_employer_account_id")
+      .references(() => employerAccounts.id, { onDelete: "restrict" }),
+    senderCandidateAccountId: uuid("sender_candidate_account_id")
+      .references(() => candidateAccounts.id, { onDelete: "restrict" }),
+    kind: applicationMessageKind("kind").default("recruitment_message").notNull(),
+    body: text("body").notNull(),
+    idempotencyKey: uuid("idempotency_key").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    readAt: timestamp("read_at", { withTimezone: true }),
+  },
+  (table) => [
+    unique("application_messages_idempotency_unique").on(
+      table.jobApplicationId,
+      table.senderRole,
+      table.idempotencyKey,
+    ),
+    index("application_messages_application_created_idx").on(
+      table.jobApplicationId,
+      table.createdAt,
+    ),
+    check("application_messages_body_length_check", sql`char_length(${table.body}) between 1 and 2000`),
+    check(
+      "application_messages_sender_check",
+      sql`(${table.senderRole} = 'employer' and ${table.senderEmployerAccountId} is not null and ${table.senderCandidateAccountId} is null) or (${table.senderRole} = 'candidate' and ${table.senderCandidateAccountId} is not null and ${table.senderEmployerAccountId} is null)`,
+    ),
+    check(
+      "application_messages_kind_sender_check",
+      sql`${table.kind} <> 'interview_invitation' or ${table.senderRole} = 'employer'`,
+    ),
+    check("application_messages_read_time_check", sql`${table.readAt} is null or ${table.readAt} >= ${table.createdAt}`),
+  ],
+);
+
+export const applicationMessageEvents = pgTable(
+  "application_message_events",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    applicationMessageId: uuid("application_message_id")
+      .notNull()
+      .references(() => applicationMessages.id, { onDelete: "cascade" }),
+    eventType: applicationMessageEventType("event_type").notNull(),
+    actorRole: applicationMessageSenderRole("actor_role").notNull(),
+    occurredAt: timestamp("occurred_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    unique("application_message_events_type_unique").on(table.applicationMessageId, table.eventType),
+    index("application_message_events_message_idx").on(table.applicationMessageId, table.occurredAt),
   ],
 );
 
@@ -755,4 +945,48 @@ export const jobApplicationRelations = relations(jobApplications, ({ one }) => (
     fields: [jobApplications.jobPostId],
     references: [jobPosts.id],
   }),
+  resumeSnapshot: one(applicationResumeSnapshots),
 }));
+
+export const applicationResumeSnapshotRelations = relations(
+  applicationResumeSnapshots,
+  ({ one, many }) => ({
+    application: one(jobApplications, {
+      fields: [applicationResumeSnapshots.jobApplicationId],
+      references: [jobApplications.id],
+    }),
+    experiences: many(applicationResumeSnapshotExperiences),
+    educations: many(applicationResumeSnapshotEducations),
+    languages: many(applicationResumeSnapshotLanguages),
+  }),
+);
+
+export const applicationResumeSnapshotExperienceRelations = relations(
+  applicationResumeSnapshotExperiences,
+  ({ one }) => ({
+    snapshot: one(applicationResumeSnapshots, {
+      fields: [applicationResumeSnapshotExperiences.jobApplicationId],
+      references: [applicationResumeSnapshots.jobApplicationId],
+    }),
+  }),
+);
+
+export const applicationResumeSnapshotEducationRelations = relations(
+  applicationResumeSnapshotEducations,
+  ({ one }) => ({
+    snapshot: one(applicationResumeSnapshots, {
+      fields: [applicationResumeSnapshotEducations.jobApplicationId],
+      references: [applicationResumeSnapshots.jobApplicationId],
+    }),
+  }),
+);
+
+export const applicationResumeSnapshotLanguageRelations = relations(
+  applicationResumeSnapshotLanguages,
+  ({ one }) => ({
+    snapshot: one(applicationResumeSnapshots, {
+      fields: [applicationResumeSnapshotLanguages.jobApplicationId],
+      references: [applicationResumeSnapshots.jobApplicationId],
+    }),
+  }),
+);

@@ -26,6 +26,7 @@ import {
   issueVerificationChallenge,
 } from "./issue-challenge";
 import { isTrustedAuthActionRequest } from "./request-security";
+import { authorizeSmsChallenge } from "./sms/rate-limit";
 import {
   destroyEmployerSession,
   setEmployerSessionCookie,
@@ -77,6 +78,7 @@ export async function requestEmployerVerificationCode(
   let issued;
   try {
     issued = await issueVerificationChallenge(identifier, {
+      authorize: () => authorizeSmsChallenge("employer", identifier),
       reserve: async ({ id, pendingDigest, pendingExpiresAt }) => {
         await db.transaction(async (transaction) => {
           await transaction.execute(

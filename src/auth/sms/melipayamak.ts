@@ -23,14 +23,14 @@ export class SmsProviderError extends Error {
 
 export interface MeliPayamakConfig {
   endpoint: URL;
-  sender: string;
+  bodyId: number;
   timeoutMs: number;
 }
 
 export function loadMeliPayamakConfig(
   environment: Record<string, string | undefined> = process.env,
 ): MeliPayamakConfig {
-  const rawEndpoint = environment.MELIPAYAMAK_SIMPLE_ENDPOINT?.trim();
+  const rawEndpoint = environment.MELIPAYAMAK_SHARED_ENDPOINT?.trim();
   if (!rawEndpoint) throw new SmsProviderError("configuration");
 
   let endpoint: URL;
@@ -46,13 +46,16 @@ export function loadMeliPayamakConfig(
     endpoint.username ||
     endpoint.password ||
     endpoint.search ||
-    endpoint.hash
+    endpoint.hash ||
+    !endpoint.pathname.startsWith("/api/send/shared/") ||
+    endpoint.pathname === "/api/send/shared/"
   ) {
     throw new SmsProviderError("configuration");
   }
 
-  const sender = environment.MELIPAYAMAK_FROM?.trim();
-  if (!sender || !/^[0-9]{3,32}$/.test(sender)) {
+  const rawBodyId = environment.MELIPAYAMAK_BODY_ID?.trim();
+  const bodyId = rawBodyId && /^[0-9]+$/.test(rawBodyId) ? Number(rawBodyId) : Number.NaN;
+  if (!Number.isSafeInteger(bodyId) || bodyId <= 0) {
     throw new SmsProviderError("configuration");
   }
 
@@ -65,7 +68,7 @@ export function loadMeliPayamakConfig(
   ) {
     throw new SmsProviderError("configuration");
   }
-  return { endpoint, sender, timeoutMs };
+  return { endpoint, bodyId, timeoutMs };
 }
 
 export function toMeliPayamakPhone(canonicalMobile: string) {
@@ -126,9 +129,9 @@ export async function sendMeliPayamakOtp(
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
-        from: config.sender,
+        bodyId: config.bodyId,
         to: toMeliPayamakPhone(canonicalMobile),
-        text: `کد ورود به JOBUT: ${verificationCode}`,
+        args: [verificationCode],
       }),
       redirect: "error",
       cache: "no-store",

@@ -8,6 +8,7 @@ export const EMPLOYER_PIPELINE_LIMIT = 100;
 
 export const PIPELINE_APPLICATION_FIELDS = [
   "applicationId",
+  "snapshotAvailable",
   "firstName",
   "lastName",
   "professionalTitle",
@@ -22,11 +23,12 @@ export const PIPELINE_QUERY_SCOPE = ["companyId", "jobId"] as const;
 
 export interface PipelineApplication {
   applicationId: string;
-  firstName: string;
-  lastName: string;
-  professionalTitle: string;
-  city: string;
-  skills: string[];
+  snapshotAvailable: boolean;
+  firstName: string | null;
+  lastName: string | null;
+  professionalTitle: string | null;
+  city: string | null;
+  skills: string[] | null;
   status: ApplicationStatus;
   createdAt: Date;
 }

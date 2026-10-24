@@ -16,9 +16,9 @@ import {
 } from "./pipeline-policy";
 
 const applications: PipelineApplication[] = [
-  { applicationId: "received-old", firstName: "علی", lastName: "رضایی", professionalTitle: "توسعه‌دهنده", city: "تهران", skills: ["TypeScript"], status: "received", createdAt: new Date("2026-10-01") },
-  { applicationId: "interview", firstName: "سارا", lastName: "محمدی", professionalTitle: "طراح محصول", city: "شیراز", skills: ["Figma"], status: "interview", createdAt: new Date("2026-10-02") },
-  { applicationId: "received-new", firstName: "مینا", lastName: "کریمی", professionalTitle: "مهندس نرم‌افزار", city: "تهران", skills: ["Node.js"], status: "received", createdAt: new Date("2026-10-03") },
+  { applicationId: "received-old", snapshotAvailable: true, firstName: "علی", lastName: "رضایی", professionalTitle: "توسعه‌دهنده", city: "تهران", skills: ["TypeScript"], status: "received", createdAt: new Date("2026-10-01") },
+  { applicationId: "interview", snapshotAvailable: true, firstName: "سارا", lastName: "محمدی", professionalTitle: "طراح محصول", city: "شیراز", skills: ["Figma"], status: "interview", createdAt: new Date("2026-10-02") },
+  { applicationId: "received-new", snapshotAvailable: true, firstName: "مینا", lastName: "کریمی", professionalTitle: "مهندس نرم‌افزار", city: "تهران", skills: ["Node.js"], status: "received", createdAt: new Date("2026-10-03") },
 ];
 
 test("Employer pipeline access requires the owned requested Job", () => {
@@ -61,7 +61,7 @@ test("draft, closed, and expired-published Job histories remain reviewable", () 
 });
 
 test("pipeline selects summary Resume fields without Candidate auth identifiers", () => {
-  assert.deepEqual(PIPELINE_APPLICATION_FIELDS, ["applicationId", "firstName", "lastName", "professionalTitle", "city", "skills", "status", "createdAt"]);
+  assert.deepEqual(PIPELINE_APPLICATION_FIELDS, ["applicationId", "snapshotAvailable", "firstName", "lastName", "professionalTitle", "city", "skills", "status", "createdAt"]);
   for (const privateField of ["candidateAccountId", "candidateResumeId", "email", "mobile", "employerNote", "statusHistory", "professionalSummary", "experiences", "educations", "languages"]) {
     assert.equal((PIPELINE_APPLICATION_FIELDS as readonly string[]).includes(privateField), false);
   }

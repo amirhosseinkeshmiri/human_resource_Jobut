@@ -93,16 +93,26 @@ export default async function EmployerJobApplicationsPage({ params, searchParams
               <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
-                    <h2 className="text-card-title">{application.firstName} {application.lastName}</h2>
+                    <h2 className="text-card-title">
+                      {application.snapshotAvailable
+                        ? `${application.firstName} ${application.lastName}`
+                        : "درخواست قدیمی"}
+                    </h2>
                     <Badge>{applicationStatusLabels[application.status]}</Badge>
                   </div>
-                  <p className="mt-1 font-semibold text-action">{application.professionalTitle}</p>
-                  <p className="text-secondary mt-1">{application.city}</p>
+                  {application.snapshotAvailable ? (
+                    <>
+                      <p className="mt-1 font-semibold text-action">{application.professionalTitle}</p>
+                      <p className="text-secondary mt-1">{application.city}</p>
+                    </>
+                  ) : (
+                    <p className="text-secondary mt-2">نسخه تاریخی قابل اتکایی از رزومه این درخواست موجود نیست.</p>
+                  )}
                   <p className="text-helper mt-3">ارسال‌شده در {dateFormatter.format(application.createdAt)}</p>
-                  <div className="mt-3 flex flex-wrap gap-2">
+                  {application.skills ? <div className="mt-3 flex flex-wrap gap-2">
                     {application.skills.slice(0, 4).map((skill) => <Badge key={skill}>{skill}</Badge>)}
                     {application.skills.length > 4 ? <Badge>+{numberFormatter.format(application.skills.length - 4)}</Badge> : null}
-                  </div>
+                  </div> : null}
                 </div>
                 <Link href={`/employer/jobs/${data.job.id}/applications/${application.applicationId}`} className={buttonClassNames({ variant: "secondary", size: "small", className: "w-full sm:w-auto" })}>
                   مشاهده رزومه
