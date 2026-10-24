@@ -26,6 +26,9 @@ Company image uploads are likewise local-development only and are ignored by
 Git. Production onboarding requires a persistent storage provider before new
 logo or gallery files can be saved.
 
+Runflare build and runtime settings are documented in
+[`docs/runflare-deployment.md`](docs/runflare-deployment.md).
+
 ```bash
 npm run db:generate  # generate SQL migrations from the schema
 npm run db:migrate   # apply pending migrations
