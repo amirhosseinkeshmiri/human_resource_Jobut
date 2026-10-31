@@ -6,7 +6,7 @@ import {
   verificationCodeMatches,
 } from "./crypto";
 import { normalizeEmployerIdentifier } from "./identifier";
-import { isBoundedAuthFormData } from "./form-security";
+import { AUTH_FORM_BODY_LIMIT, isBoundedAuthFormData } from "./form-security";
 import { isExpectedAuthOrigin } from "./origin-policy";
 import { createEmployerSessionMaterial } from "./session-material";
 
@@ -69,6 +69,29 @@ test("auth forms reject extra fields and bodies larger than two kilobytes", () =
 
   const oversized = new FormData();
   oversized.set("identifier", "x".repeat(2049));
+  assert.equal(isBoundedAuthFormData(oversized, ["identifier"]), false);
+});
+
+test("auth forms accept bounded Next.js Server Action metadata", () => {
+  const formData = new FormData();
+  formData.set("$ACTION_REF_1", "");
+  formData.set("$ACTION_1:0", JSON.stringify({ id: "server-action-id", bound: "$@1" }));
+  formData.set("$ACTION_1:1", JSON.stringify([{ status: "idle" }]));
+  formData.set("$ACTION_KEY", "k0557d46c29eb5e080e964f3110a2040d");
+  formData.set("identifier", "employer@example.com");
+
+  assert.equal(isBoundedAuthFormData(formData, ["identifier"]), true);
+});
+
+test("auth forms still reject forged or oversized Server Action metadata", () => {
+  const forged = new FormData();
+  forged.set("$ACTION_NOT_FRAMEWORK_METADATA", "ignored");
+  forged.set("identifier", "employer@example.com");
+  assert.equal(isBoundedAuthFormData(forged, ["identifier"]), false);
+
+  const oversized = new FormData();
+  oversized.set("$ACTION_KEY", "x".repeat(AUTH_FORM_BODY_LIMIT));
+  oversized.set("identifier", "employer@example.com");
   assert.equal(isBoundedAuthFormData(oversized, ["identifier"]), false);
 });
 
