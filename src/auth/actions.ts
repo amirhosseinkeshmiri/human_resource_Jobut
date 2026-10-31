@@ -17,7 +17,6 @@ import {
   getAuthSecret,
   verificationCodeMatches,
 } from "./crypto";
-import { hasDevelopmentDelivery } from "./delivery";
 import { isBoundedAuthFormData } from "./form-security";
 import { normalizeEmployerIdentifier, normalizeVerificationCode } from "./identifier";
 import {
@@ -65,13 +64,6 @@ export async function requestEmployerVerificationCode(
     return {
       status: "error",
       message: "ایمیل یا شماره موبایل ایرانی معتبر وارد کنید.",
-    };
-  }
-
-  if (identifier.type === "email" && !hasDevelopmentDelivery()) {
-    return {
-      status: "error",
-      message: "ارسال کد ورود هنوز برای محیط اصلی پیکربندی نشده است.",
     };
   }
 
@@ -143,7 +135,7 @@ export async function requestEmployerVerificationCode(
       message:
         error instanceof ChallengeCooldownError
           ? "برای دریافت کد جدید کمی صبر کنید."
-          : "ارسال پیامک کد ورود انجام نشد. دوباره تلاش کنید.",
+          : "ارسال کد ورود انجام نشد. دوباره تلاش کنید.",
     };
   }
 

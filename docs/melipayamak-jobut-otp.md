@@ -17,35 +17,48 @@ SMS_PROVIDER=melipayamak
 MELIPAYAMAK_SHARED_ENDPOINT=<secret full /api/send/shared/... endpoint>
 MELIPAYAMAK_BODY_ID=561397
 SMS_TIMEOUT_MS=5000
-AUTH_TRUSTED_PROXY_HOPS=1
-SMS_RATE_LIMIT_IDENTIFIER_MAX=3
-SMS_RATE_LIMIT_IDENTIFIER_WINDOW_SECONDS=600
-SMS_RATE_LIMIT_IP_MAX=10
-SMS_RATE_LIMIT_IP_WINDOW_SECONDS=600
-SMS_RATE_LIMIT_GLOBAL_MAX=100
-SMS_RATE_LIMIT_GLOBAL_WINDOW_SECONDS=60
-SMS_RATE_LIMIT_ADMIN_IDENTIFIER_MAX=2
-SMS_RATE_LIMIT_ADMIN_IDENTIFIER_WINDOW_SECONDS=900
-SMS_RATE_LIMIT_ADMIN_IP_MAX=4
-SMS_RATE_LIMIT_ADMIN_IP_WINDOW_SECONDS=900
+OTP_RATE_LIMIT_IDENTIFIER_MAX=3
+OTP_RATE_LIMIT_IDENTIFIER_WINDOW_SECONDS=600
+OTP_RATE_LIMIT_ACCOUNT_MAX=3
+OTP_RATE_LIMIT_ACCOUNT_WINDOW_SECONDS=600
+OTP_RATE_LIMIT_GLOBAL_MAX=100
+OTP_RATE_LIMIT_GLOBAL_WINDOW_SECONDS=60
+OTP_RATE_LIMIT_ADMIN_IDENTIFIER_MAX=2
+OTP_RATE_LIMIT_ADMIN_IDENTIFIER_WINDOW_SECONDS=900
+OTP_PROVIDER_CIRCUIT_FAILURE_MAX=5
+OTP_PROVIDER_CIRCUIT_WINDOW_SECONDS=300
+OTP_IP_RATE_LIMIT_ENABLED=false
+# فقط پس از تأیید قرارداد ingress:
+AUTH_TRUSTED_PROXY_HOPS=
+OTP_RATE_LIMIT_IP_MAX=10
+OTP_RATE_LIMIT_IP_WINDOW_SECONDS=600
+OTP_RATE_LIMIT_ADMIN_IP_MAX=4
+OTP_RATE_LIMIT_ADMIN_IP_WINDOW_SECONDS=900
 APP_URL=https://www.jobut.ir
 ```
 
 endpoint باید HTTPS، با مسیر `/api/send/shared/...`، بدون redirect/query/fragment/URL credentials، روی hostname دقیق `console.melipayamak.com` و پورت استاندارد باشد. `MELIPAYAMAK_BODY_ID` باید عدد صحیح مثبت باشد. `AUTH_SECRET` موجود برای HMAC استفاده می‌شود.
 
-محدودکننده پیامک با شمارنده‌های اتمیک PostgreSQL و پیش از فراخوانی provider اجرا می‌شود. کلید شماره و IP با HMAC ساخته می‌شود و مقدار خام آن‌ها در جدول limiter ذخیره نمی‌شود. سهمیه شناسه میان Employer و Candidate و Admin مشترک است و Admin علاوه بر آن محدودیت سخت‌گیرانه‌تری دارد. شکست provider سهمیه رزروشده را برنمی‌گرداند تا failure قابل سوءاستفاده نباشد؛ خرابی limiter نیز ارسال را fail-closed متوقف می‌کند.
+محدودکننده OTP با رویدادهای rolling-window و قفل transaction-level اتمیک PostgreSQL و پیش از فراخوانی provider اجرا می‌شود. کلید شناسه، حساب و IP با HMAC ساخته می‌شود و مقدار خام در جدول limiter ذخیره نمی‌شود. سهمیه شناسه میان نقش‌ها مشترک، سهمیه حساب برای هر نقش جدا، بودجه provider سراسری و Admin دارای bucket سخت‌گیرانه‌تر است. شکست provider سهمیه رزروشده را برنمی‌گرداند و circuit breaker مشترک را تغذیه می‌کند؛ خرابی limiter نیز ارسال را fail-closed متوقف می‌کند.
 
 در ورود Admin، شناسه‌های معتبر از نظر قالب همیشه پاسخ عمومی challenge‌شکل یکسان می‌گیرند. شناسه ناشناخته از limiter سخت‌گیرانه Admin عبور می‌کند و فقط محاسبه رمزنگاری decoy انجام می‌دهد؛ هیچ پیامک، challenge پایدار، حساب یا session برای آن ساخته نمی‌شود. خطاهای provider، cooldown و verification نیز وجود حساب را در پیام یا redirect آشکار نمی‌کنند.
 
 `AUTH_TRUSTED_PROXY_HOPS` باید دقیقاً با تعداد reverse proxyهای مورد اعتماد بین کاربر و برنامه برابر باشد. برنامه IP را از مرز سمت راست `X-Forwarded-For` انتخاب و مقادیر سمت چپ را نادیده می‌گیرد. مبدأ برنامه باید فقط از ingress مورد اعتماد Runflare قابل دسترسی باشد و ingress باید IP اتصال را به header اضافه کند؛ در غیر این صورت هیچ تنظیم نرم‌افزاری نمی‌تواند header ارسالی مستقیم کاربر را قابل اعتماد کند.
 
+مستندات عمومی Runflare در حال حاضر تعداد hop یا قرارداد دقیق `X-Forwarded-For` را
+مشخص نمی‌کند؛ مقدار `1` نباید صرفاً براساس نمونه تنظیم شود. تا دریافت قرارداد رسمی،
+`OTP_IP_RATE_LIMIT_ENABLED=false` است و `X-Forwarded-For` و `X-Real-IP` اصلاً وارد تصمیم
+امنیتی نمی‌شوند. limiter اجباری PostgreSQL مستقل از IP باقی می‌ماند. پس از تأیید ingress،
+IP protection و hop count هم‌زمان فعال شوند؛ ناسازگاری این لایه به‌صورت fail-closed عمل
+می‌کند و هیچ IP خامی log نمی‌شود.
+
 ## آزمون عملیاتی
 
 1. endpoint کامل و محرمانه shared service را از پنل MeliPayamak دریافت و body ID تأییدشده `561397` را تنظیم کنید.
-2. migration شمارنده توزیع‌شده را پس از بازبینی دستی اجرا کنید.
+2. migration `0017_glorious_gravity.sql` را پس از کل زنجیره قبلی و بازبینی دستی اجرا کنید.
 3. متغیرها را فقط در secretهای Runflare تنظیم، تعداد proxy hop را با زیرساخت تأیید و deployment را restart کنید.
 4. برای شماره‌های کنترل‌شده، ورود موبایلی Employer و Candidate و سپس Admin از قبل ایجادشده را آزمایش کنید.
-5. cooldown یک‌دقیقه‌ای، سهمیه‌های identifier/IP/global، انقضای ده‌دقیقه‌ای، سقف پنج تلاش، یک‌بارمصرف بودن و باطل شدن کد قدیمی پس از resend را بررسی کنید.
+5. cooldown یک‌دقیقه‌ای، سهمیه‌های identifier/account/global، circuit breaker، انقضای ده‌دقیقه‌ای، سقف پنج تلاش، یک‌بارمصرف بودن و باطل شدن کد قدیمی پس از resend را بررسی کنید؛ IP فقط پس از تأیید ingress آزموده شود.
 6. لاگ‌ها و bundle مرورگر را از نبود شماره، IP، OTP و endpoint بازبینی کنید.
 
-ارسال ایمیل خارج از این integration است و همچنان provider تولیدی ندارد. cooldown با قفل advisory و داده challenge در PostgreSQL اعمال می‌شود و limiter حافظه‌ای یا وابستگی Redis اضافه نشده است.
+OTP ایمیلی SMTP نیز از bucketهای مستقل channel و همان کنترل‌های اجباری PostgreSQL استفاده می‌کند. cooldown با قفل advisory و داده challenge در PostgreSQL اعمال می‌شود و limiter حافظه‌ای یا وابستگی Redis اضافه نشده است.

@@ -6,7 +6,15 @@ import { headers } from "next/headers";
 const MAX_TRUSTED_PROXY_HOPS = 10;
 
 export class TrustedClientIpError extends Error {
-  constructor() {
+  constructor(
+    public readonly reason:
+      | "missing_config"
+      | "invalid_config"
+      | "missing_header"
+      | "invalid_chain"
+      | "insufficient_chain",
+    public readonly forwardedChainLength: number,
+  ) {
     super("trusted_client_ip_unavailable");
     this.name = "TrustedClientIpError";
   }
@@ -16,19 +24,28 @@ export function resolveTrustedClientIp(
   forwardedFor: string | null,
   trustedProxyHopsValue: string | undefined,
 ) {
+  const chain = forwardedFor
+    ? forwardedFor.split(",").map((entry) => entry.trim())
+    : [];
+  if (trustedProxyHopsValue === undefined || trustedProxyHopsValue.trim() === "") {
+    throw new TrustedClientIpError("missing_config", chain.length);
+  }
   const trustedProxyHops = Number(trustedProxyHopsValue?.trim());
   if (
     !Number.isInteger(trustedProxyHops) ||
     trustedProxyHops < 1 ||
-    trustedProxyHops > MAX_TRUSTED_PROXY_HOPS ||
-    !forwardedFor
+    trustedProxyHops > MAX_TRUSTED_PROXY_HOPS
   ) {
-    throw new TrustedClientIpError();
+    throw new TrustedClientIpError("invalid_config", chain.length);
   }
-
-  const chain = forwardedFor.split(",").map((entry) => entry.trim());
-  if (chain.some((entry) => !isIP(entry)) || chain.length < trustedProxyHops) {
-    throw new TrustedClientIpError();
+  if (!forwardedFor) {
+    throw new TrustedClientIpError("missing_header", 0);
+  }
+  if (chain.some((entry) => !isIP(entry))) {
+    throw new TrustedClientIpError("invalid_chain", chain.length);
+  }
+  if (chain.length < trustedProxyHops) {
+    throw new TrustedClientIpError("insufficient_chain", chain.length);
   }
 
   // Trusted proxies append addresses on the right. Ignoring all values to the

@@ -60,6 +60,24 @@ export const smsRateLimits = pgTable(
   ],
 );
 
+export const otpRateLimitEvents = pgTable(
+  "otp_rate_limit_events",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    bucketKey: varchar("bucket_key", { length: 100 }).notNull(),
+    eventType: varchar("event_type", { length: 24 }).default("request").notNull(),
+    occurredAt: timestamp("occurred_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("otp_rate_limit_events_bucket_time_idx").on(table.bucketKey, table.occurredAt),
+    index("otp_rate_limit_events_occurred_at_idx").on(table.occurredAt),
+    check(
+      "otp_rate_limit_events_type_check",
+      sql`${table.eventType} in ('request', 'provider_failure')`,
+    ),
+  ],
+);
+
 export const employerAuthChallenges = pgTable(
   "employer_auth_challenges",
   {

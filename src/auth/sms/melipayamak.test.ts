@@ -59,6 +59,7 @@ test("production mobile delivery remains isolated from email and development", (
   assert.equal(resolveVerificationDeliveryMode(mobile, "production", "melipayamak"), "melipayamak");
   assert.equal(resolveVerificationDeliveryMode(mobile, "production", undefined), "unavailable");
   assert.equal(resolveVerificationDeliveryMode({ type: "email", value: "user@example.com" }, "production", "melipayamak"), "unavailable");
+  assert.equal(resolveVerificationDeliveryMode({ type: "email", value: "user@example.com" }, "production", "melipayamak", "smtp"), "smtp");
   assert.equal(resolveVerificationDeliveryMode(mobile, "development", undefined), "development");
 });
 

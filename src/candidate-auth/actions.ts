@@ -13,7 +13,6 @@ import {
   getAuthSecret,
   verificationCodeMatches,
 } from "@/auth/crypto";
-import { hasDevelopmentDelivery } from "@/auth/delivery";
 import { isBoundedAuthFormData } from "@/auth/form-security";
 import { normalizeAuthIdentifier, normalizeVerificationCode } from "@/auth/identifier";
 import {
@@ -56,13 +55,6 @@ export async function requestCandidateVerificationCode(
 
   if (!identifier) {
     return { status: "error", message: "ایمیل یا شماره موبایل ایرانی معتبر وارد کنید." };
-  }
-
-  if (identifier.type === "email" && !hasDevelopmentDelivery()) {
-    return {
-      status: "error",
-      message: "ارسال کد ورود هنوز برای محیط اصلی پیکربندی نشده است.",
-    };
   }
 
   let issued;
@@ -133,7 +125,7 @@ export async function requestCandidateVerificationCode(
       message:
         error instanceof ChallengeCooldownError
           ? "برای دریافت کد جدید کمی صبر کنید."
-          : "ارسال پیامک کد ورود انجام نشد. دوباره تلاش کنید.",
+          : "ارسال کد ورود انجام نشد. دوباره تلاش کنید.",
     };
   }
   return {

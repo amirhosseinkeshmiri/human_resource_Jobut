@@ -2,8 +2,14 @@ import "server-only";
 import { randomBytes, randomUUID } from "node:crypto";
 import { VERIFICATION_CODE_TTL_MINUTES } from "./challenge-policy";
 import { digestVerificationCode, generateVerificationCode, getAuthSecret } from "./crypto";
-import { deliverVerificationCode } from "./delivery";
+import { deliverVerificationCode, resolveVerificationDeliveryMode } from "./delivery";
 import type { AuthIdentifier } from "./identifier";
+import {
+  createOtpCorrelationId,
+  logOtpFailure,
+  type OtpProvider,
+  type OtpStage,
+} from "./otp-diagnostics";
 
 export const VERIFICATION_CODE_RESEND_COOLDOWN_SECONDS = 60;
 
@@ -34,7 +40,11 @@ export async function issueVerificationChallenge(
   identifier: AuthIdentifier,
   callbacks: IssueChallengeCallbacks,
   deliver: typeof deliverVerificationCode = deliverVerificationCode,
+  diagnosticContext?: { correlationId?: string; provider?: OtpProvider },
 ) {
+  const startedAt = Date.now();
+  const correlationId = diagnosticContext?.correlationId ?? createOtpCorrelationId();
+  const provider = diagnosticContext?.provider ?? resolveVerificationDeliveryMode(identifier);
   const id = randomUUID();
   const secret = getAuthSecret();
   const pendingDigest = digestVerificationCode(
@@ -42,13 +52,18 @@ export async function issueVerificationChallenge(
     `pending:${randomBytes(32).toString("hex")}`,
     secret,
   );
-  await callbacks.reserve({ id, pendingDigest, pendingExpiresAt: new Date(0) });
-
   const verificationCode = generateVerificationCode();
+  let stage: OtpStage = "challenge_reserve";
+  let reserved = false;
   try {
+    await callbacks.reserve({ id, pendingDigest, pendingExpiresAt: new Date(0) });
+    reserved = true;
+    stage = "rate_limit";
     await callbacks.authorize?.();
+    stage = "provider_delivery";
     const delivery = await deliver(identifier, verificationCode);
     const codeDigest = digestVerificationCode(id, verificationCode, secret);
+    stage = "challenge_activate";
     const activated = await callbacks.activate({
       id,
       codeDigest,
@@ -56,8 +71,19 @@ export async function issueVerificationChallenge(
     });
     if (!activated) throw new Error("challenge_activation_failed");
     return { challengeId: id, developmentCode: delivery.developmentCode };
-  } catch {
-    await callbacks.invalidate(id).catch(() => undefined);
+  } catch (error) {
+    logOtpFailure({ correlationId, stage, provider, error, startedAt });
+    if (reserved) {
+      await callbacks.invalidate(id).catch((invalidationError) => {
+        logOtpFailure({
+          correlationId,
+          stage: "challenge_invalidate",
+          provider,
+          error: invalidationError,
+          startedAt,
+        });
+      });
+    }
     throw new Error("verification_delivery_failed");
   }
 }

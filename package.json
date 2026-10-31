@@ -10,7 +10,9 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build --webpack",
+    "prestart": "npm run verify:production-runtime",
     "start": "next start",
+    "verify:production-runtime": "node scripts/verify-production-runtime.mjs",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test:auth": "NODE_OPTIONS=--conditions=react-server tsx --test src/auth/auth.test.ts",
@@ -32,14 +34,15 @@
     "@hookform/resolvers": "5.9.1",
     "@tailwindcss/postcss": "4.3.3",
     "drizzle-orm": "0.45.3",
-    "next": "16.3.8",
+    "next": "16.4.3",
+    "nodemailer": "10.2.1",
     "postgres": "3.4.9",
     "react": "19.3.0",
     "react-dom": "19.3.0",
     "react-hook-form": "7.89.0",
-    "sanitize-html": "2.18.0",
+    "sanitize-html": "2.18.1",
     "server-only": "0.0.1",
-    "zod": "4.6.5"
+    "zod": "4.6.7"
   },
   "devDependencies": {
     "@types/node": "26.6.4",
@@ -48,7 +51,7 @@
     "@types/sanitize-html": "2.16.2",
     "drizzle-kit": "0.31.11",
     "eslint": "9.39.5",
-    "eslint-config-next": "16.3.8",
+    "eslint-config-next": "16.4.3",
     "tailwindcss": "4.3.3",
     "tsx": "4.23.15",
     "typescript": "5.9.3"

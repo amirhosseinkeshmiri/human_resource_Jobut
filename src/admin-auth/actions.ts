@@ -14,12 +14,14 @@ import {
 import { hasDevelopmentDelivery } from "@/auth/delivery";
 import { isBoundedAuthFormData } from "@/auth/form-security";
 import { normalizeAuthIdentifier, normalizeVerificationCode } from "@/auth/identifier";
+import { resolveVerificationDeliveryMode } from "@/auth/delivery";
 import {
   ChallengeCooldownError,
   isWithinVerificationCodeCooldown,
   issueVerificationChallenge,
 } from "@/auth/issue-challenge";
 import { isTrustedAuthActionRequest } from "@/auth/request-security";
+import { createOtpCorrelationId, logOtpFailure } from "@/auth/otp-diagnostics";
 import { authorizeSmsChallenge } from "@/auth/sms/rate-limit";
 import { createAdminSessionMaterial } from "@/auth/session-material";
 import { db } from "@/db";
@@ -61,6 +63,9 @@ export async function requestAdminVerificationCode(
   if (!identifier) {
     return { status: "error", message: "شناسه ورود معتبر نیست." };
   }
+  const correlationId = createOtpCorrelationId();
+  const startedAt = Date.now();
+  const provider = resolveVerificationDeliveryMode(identifier);
   try {
     const [account] = await db
       .select({ id: adminAccounts.id })
@@ -143,10 +148,17 @@ export async function requestAdminVerificationCode(
                   ),
                 );
             },
-          }),
+          }, undefined, { correlationId, provider }),
       },
     );
-  } catch {
+  } catch (error) {
+    logOtpFailure({
+      correlationId,
+      stage: "account_lookup",
+      provider,
+      error,
+      startedAt,
+    });
     return issueAdminChallengeIndistinguishably(identifier, false, {
       developmentDelivery: hasDevelopmentDelivery(),
       authorizeUnknownIdentifier: async () => undefined,

@@ -2,244 +2,189 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { resolveTrustedClientIp, TrustedClientIpError } from "./client-ip";
 import {
+  buildSmsRateLimitRules,
   enforceSmsRateLimit,
+  loadSmsRateLimitPolicy,
+  OtpProviderCircuitOpenError,
+  recordOtpProviderFailure,
   type RateLimitResult,
   type RateLimitRule,
   SmsRateLimitExceededError,
   SmsRateLimitUnavailableError,
   type SmsRateLimitStore,
 } from "./rate-limit";
-import { issueVerificationChallenge } from "../issue-challenge";
 
 const AUTH_SECRET = "test-only-auth-secret-that-is-longer-than-32-characters";
 
 class SharedAtomicStore implements SmsRateLimitStore {
-  private readonly counters = new Map<string, { count: number; expiresAt: number }>();
+  private queue = Promise.resolve();
+  private readonly events = new Map<string, number[]>();
+  private readonly failures = new Map<string, number[]>();
 
-  constructor(private readonly now = () => Date.now()) {}
+  constructor(private now = () => Date.now()) {}
 
-  async consume(rules: readonly RateLimitRule[]) {
-    const currentTime = this.now();
-    const pending = rules.map((rule): RateLimitResult & { expiresAt: number } => {
-      const existing = this.counters.get(rule.key);
-      const count = !existing || existing.expiresAt <= currentTime ? 1 : existing.count + 1;
-      return {
-        key: rule.key,
-        count,
-        limit: rule.limit,
-        expiresAt:
-          !existing || existing.expiresAt <= currentTime
-            ? currentTime + rule.windowSeconds * 1_000
-            : existing.expiresAt,
-      };
-    });
-    if (pending.some((result) => result.count > result.limit)) return pending;
-    for (const result of pending) {
-      this.counters.set(result.key, { count: result.count, expiresAt: result.expiresAt });
+  async consume(rules: readonly RateLimitRule[], circuitRule?: RateLimitRule) {
+    let release!: () => void;
+    const previous = this.queue;
+    this.queue = new Promise<void>((resolve) => { release = resolve; });
+    await previous;
+    try {
+      const timestamp = this.now();
+      if (circuitRule) {
+        const failures = (this.failures.get(circuitRule.key) ?? [])
+          .filter((at) => at > timestamp - circuitRule.windowSeconds * 1_000);
+        if (failures.length >= circuitRule.limit) throw new OtpProviderCircuitOpenError();
+      }
+      const pending = rules.map((rule): RateLimitResult => {
+        const current = (this.events.get(rule.key) ?? [])
+          .filter((at) => at > timestamp - rule.windowSeconds * 1_000);
+        if (current.length >= rule.limit) throw new SmsRateLimitExceededError();
+        return { key: rule.key, count: current.length + 1, limit: rule.limit };
+      });
+      for (const rule of rules) {
+        const current = (this.events.get(rule.key) ?? [])
+          .filter((at) => at > timestamp - rule.windowSeconds * 1_000);
+        this.events.set(rule.key, [...current, timestamp]);
+      }
+      return pending;
+    } finally {
+      release();
     }
-    return pending;
+  }
+
+  async recordProviderFailure(bucketKey: string) {
+    this.failures.set(bucketKey, [...(this.failures.get(bucketKey) ?? []), this.now()]);
   }
 }
 
 function environment(overrides: Record<string, string> = {}) {
   return {
     AUTH_SECRET,
-    SMS_RATE_LIMIT_IDENTIFIER_MAX: "10",
-    SMS_RATE_LIMIT_IDENTIFIER_WINDOW_SECONDS: "600",
-    SMS_RATE_LIMIT_IP_MAX: "10",
-    SMS_RATE_LIMIT_IP_WINDOW_SECONDS: "600",
-    SMS_RATE_LIMIT_GLOBAL_MAX: "100",
-    SMS_RATE_LIMIT_GLOBAL_WINDOW_SECONDS: "60",
-    SMS_RATE_LIMIT_ADMIN_IDENTIFIER_MAX: "2",
-    SMS_RATE_LIMIT_ADMIN_IDENTIFIER_WINDOW_SECONDS: "900",
-    SMS_RATE_LIMIT_ADMIN_IP_MAX: "4",
-    SMS_RATE_LIMIT_ADMIN_IP_WINDOW_SECONDS: "900",
+    OTP_RATE_LIMIT_IDENTIFIER_MAX: "10",
+    OTP_RATE_LIMIT_IDENTIFIER_WINDOW_SECONDS: "600",
+    OTP_RATE_LIMIT_ACCOUNT_MAX: "10",
+    OTP_RATE_LIMIT_ACCOUNT_WINDOW_SECONDS: "600",
+    OTP_IP_RATE_LIMIT_ENABLED: "false",
+    OTP_RATE_LIMIT_IP_MAX: "10",
+    OTP_RATE_LIMIT_IP_WINDOW_SECONDS: "600",
+    OTP_RATE_LIMIT_GLOBAL_MAX: "100",
+    OTP_RATE_LIMIT_GLOBAL_WINDOW_SECONDS: "60",
+    OTP_RATE_LIMIT_ADMIN_IDENTIFIER_MAX: "2",
+    OTP_RATE_LIMIT_ADMIN_IDENTIFIER_WINDOW_SECONDS: "900",
+    OTP_RATE_LIMIT_ADMIN_IP_MAX: "4",
+    OTP_RATE_LIMIT_ADMIN_IP_WINDOW_SECONDS: "900",
+    OTP_PROVIDER_CIRCUIT_FAILURE_MAX: "5",
+    OTP_PROVIDER_CIRCUIT_WINDOW_SECONDS: "300",
     ...overrides,
   };
 }
 
-test("multiple numbers from one IP are blocked before provider delivery", async () => {
+test("mandatory identifier limit works without proxy or client IP configuration", async () => {
   const store = new SharedAtomicStore();
-  const env = environment({ SMS_RATE_LIMIT_IP_MAX: "2" });
-  let providerCalls = 0;
-
-  for (const identifier of ["+989121111111", "+989122222222"]) {
-    await enforceSmsRateLimit(
-      { domain: "candidate", identifier, clientIp: "203.0.113.10", environment: env },
-      store,
-    );
-    providerCalls += 1;
-  }
+  const env = environment({ OTP_RATE_LIMIT_IDENTIFIER_MAX: "2" });
+  await enforceSmsRateLimit({ domain: "candidate", identifier: "user@example.com", environment: env, channel: "email" }, store);
+  await enforceSmsRateLimit({ domain: "employer", identifier: "user@example.com", environment: env, channel: "email" }, store);
   await assert.rejects(
-    enforceSmsRateLimit(
-      {
-        domain: "employer",
-        identifier: "+989123333333",
-        clientIp: "203.0.113.10",
-        environment: env,
-      },
-      store,
-    ),
-    SmsRateLimitExceededError,
-  );
-  assert.equal(providerCalls, 2);
-});
-
-test("repeated requests to one identifier are shared across auth domains", async () => {
-  const store = new SharedAtomicStore();
-  const env = environment({ SMS_RATE_LIMIT_IDENTIFIER_MAX: "2" });
-  const input = { identifier: "+989121234567", clientIp: "203.0.113.20", environment: env };
-
-  await enforceSmsRateLimit({ domain: "candidate", ...input }, store);
-  await enforceSmsRateLimit({ domain: "employer", ...input }, store);
-  await assert.rejects(
-    enforceSmsRateLimit({ domain: "candidate", ...input }, store),
+    enforceSmsRateLimit({ domain: "candidate", identifier: "user@example.com", environment: env, channel: "email" }, store),
     SmsRateLimitExceededError,
   );
 });
 
-test("concurrent requests from separate limiter instances share one atomic quota", async () => {
-  const sharedStore = new SharedAtomicStore();
-  const env = environment({ SMS_RATE_LIMIT_GLOBAL_MAX: "3" });
-  const attempts = Array.from({ length: 12 }, (_, index) =>
-    enforceSmsRateLimit(
-      {
-        domain: "candidate",
-        identifier: `+98912${String(index).padStart(7, "0")}`,
-        clientIp: `203.0.113.${index + 1}`,
-        environment: env,
-      },
-      sharedStore,
-    ),
+test("optional IP limiter blocks multiple identifiers only when enabled", async () => {
+  const store = new SharedAtomicStore();
+  const env = environment({ OTP_IP_RATE_LIMIT_ENABLED: "true", OTP_RATE_LIMIT_IP_MAX: "2" });
+  await enforceSmsRateLimit({ domain: "candidate", identifier: "one@example.com", clientIp: "203.0.113.10", environment: env, channel: "email" }, store);
+  await enforceSmsRateLimit({ domain: "employer", identifier: "two@example.com", clientIp: "203.0.113.10", environment: env, channel: "email" }, store);
+  await assert.rejects(
+    enforceSmsRateLimit({ domain: "candidate", identifier: "three@example.com", clientIp: "203.0.113.10", environment: env, channel: "email" }, store),
+    SmsRateLimitExceededError,
   );
+});
 
+test("IP protection fails closed when enabled without a trusted address", async () => {
+  await assert.rejects(
+    enforceSmsRateLimit({
+      domain: "candidate",
+      identifier: "user@example.com",
+      environment: environment({ OTP_IP_RATE_LIMIT_ENABLED: "true" }),
+      channel: "email",
+    }, new SharedAtomicStore()),
+    SmsRateLimitUnavailableError,
+  );
+});
+
+test("concurrent simulated instances cannot exceed the shared global budget", async () => {
+  const store = new SharedAtomicStore();
+  const env = environment({ OTP_RATE_LIMIT_GLOBAL_MAX: "3" });
+  const attempts = Array.from({ length: 12 }, (_, index) => enforceSmsRateLimit({
+    domain: "candidate",
+    identifier: `user${index}@example.com`,
+    environment: env,
+    channel: "email",
+  }, store));
   const results = await Promise.allSettled(attempts);
   assert.equal(results.filter((result) => result.status === "fulfilled").length, 3);
   assert.equal(results.filter((result) => result.status === "rejected").length, 9);
 });
 
-test("global quota exhaustion blocks delivery regardless of identifier and IP", async () => {
+test("rolling window expires old events", async () => {
+  let now = 1_000_000;
+  const store = new SharedAtomicStore(() => now);
+  const env = environment({ OTP_RATE_LIMIT_IDENTIFIER_MAX: "1", OTP_RATE_LIMIT_IDENTIFIER_WINDOW_SECONDS: "10" });
+  const input = { domain: "candidate" as const, identifier: "user@example.com", environment: env, channel: "email" as const };
+  await enforceSmsRateLimit(input, store);
+  await assert.rejects(enforceSmsRateLimit(input, store), SmsRateLimitExceededError);
+  now += 10_001;
+  await enforceSmsRateLimit(input, store);
+});
+
+test("provider failure circuit opens before another send is authorized", async () => {
   const store = new SharedAtomicStore();
-  const env = environment({ SMS_RATE_LIMIT_GLOBAL_MAX: "1" });
-  await enforceSmsRateLimit(
-    {
-      domain: "employer",
-      identifier: "+989121111111",
-      clientIp: "203.0.113.1",
-      environment: env,
-    },
-    store,
-  );
+  const env = environment({ OTP_PROVIDER_CIRCUIT_FAILURE_MAX: "2" });
+  await recordOtpProviderFailure("email", store);
+  await recordOtpProviderFailure("email", store);
   await assert.rejects(
-    enforceSmsRateLimit(
-      {
-        domain: "candidate",
-        identifier: "+989129999999",
-        clientIp: "198.51.100.1",
-        environment: env,
-      },
-      store,
-    ),
-    SmsRateLimitExceededError,
+    enforceSmsRateLimit({ domain: "candidate", identifier: "user@example.com", environment: env, channel: "email" }, store),
+    OtpProviderCircuitOpenError,
   );
 });
 
-test("admin authentication has stricter identifier limits", async () => {
+test("admin authentication retains a stricter identifier bucket", async () => {
   const store = new SharedAtomicStore();
-  const env = environment();
-  const input = {
-    domain: "admin" as const,
-    identifier: "+989121234567",
-    clientIp: "203.0.113.30",
-    environment: env,
-  };
+  const input = { domain: "admin" as const, identifier: "admin@example.com", environment: environment(), channel: "email" as const };
   await enforceSmsRateLimit(input, store);
   await enforceSmsRateLimit(input, store);
   await assert.rejects(enforceSmsRateLimit(input, store), SmsRateLimitExceededError);
 });
 
-test("provider failures consume quota and the blocked request never reaches provider", async () => {
-  const previousSecret = process.env.AUTH_SECRET;
-  process.env.AUTH_SECRET = AUTH_SECRET;
-  const store = new SharedAtomicStore();
-  const env = environment({ SMS_RATE_LIMIT_IDENTIFIER_MAX: "2" });
-  let providerCalls = 0;
-  const callbacks = {
-    authorize: () =>
-      enforceSmsRateLimit(
-        {
-          domain: "candidate" as const,
-          identifier: "+989121234567",
-          clientIp: "203.0.113.40",
-          environment: env,
-        },
-        store,
-      ),
-    reserve: async () => undefined,
-    activate: async () => true,
-    invalidate: async () => undefined,
-  };
-  try {
-    for (let attempt = 0; attempt < 2; attempt += 1) {
-      await assert.rejects(
-        issueVerificationChallenge(
-          { type: "mobile", value: "+989121234567" },
-          callbacks,
-          async () => {
-            providerCalls += 1;
-            throw new Error("provider unavailable");
-          },
-        ),
-        /verification_delivery_failed/,
-      );
-    }
-    await assert.rejects(
-      issueVerificationChallenge(
-        { type: "mobile", value: "+989121234567" },
-        callbacks,
-        async () => {
-          providerCalls += 1;
-          return {};
-        },
-      ),
-      /verification_delivery_failed/,
-    );
-    assert.equal(providerCalls, 2);
-  } finally {
-    if (previousSecret === undefined) delete process.env.AUTH_SECRET;
-    else process.env.AUTH_SECRET = previousSecret;
-  }
-});
-
-test("an unavailable shared limiter fails closed", async () => {
-  const unavailableStore: SmsRateLimitStore = {
-    consume: async () => {
-      throw new Error("database unavailable");
-    },
+test("database limiter failure fails closed", async () => {
+  const unavailable: SmsRateLimitStore = {
+    consume: async () => { throw new Error("database unavailable"); },
+    recordProviderFailure: async () => { throw new Error("database unavailable"); },
   };
   await assert.rejects(
-    enforceSmsRateLimit(
-      {
-        domain: "candidate",
-        identifier: "+989121234567",
-        clientIp: "203.0.113.50",
-        environment: environment(),
-      },
-      unavailableStore,
-    ),
+    enforceSmsRateLimit({ domain: "candidate", identifier: "user@example.com", environment: environment(), channel: "email" }, unavailable),
     SmsRateLimitUnavailableError,
   );
 });
 
-test("spoofed left-side forwarding values cannot replace the trusted client boundary", () => {
-  assert.equal(
-    resolveTrustedClientIp("1.1.1.1, 8.8.8.8, 203.0.113.55", "1"),
-    "203.0.113.55",
+test("bucket keys use HMAC and never contain plaintext identifiers", () => {
+  const rules = buildSmsRateLimitRules("candidate", "private@example.com", null, loadSmsRateLimitPolicy(environment()), AUTH_SECRET, "email");
+  assert.equal(rules.some((rule) => rule.key.includes("private@example.com")), false);
+});
+
+test("spoofed forwarding headers are irrelevant while IP protection is disabled", () => {
+  const rules = buildSmsRateLimitRules("candidate", "user@example.com", "1.1.1.1", loadSmsRateLimitPolicy(environment()), AUTH_SECRET, "email");
+  assert.equal(rules.some((rule) => rule.key.includes(":ip:")), false);
+  assert.throws(() => resolveTrustedClientIp("spoofed, 203.0.113.55", "1"), (error) =>
+    error instanceof TrustedClientIpError && error.reason === "invalid_chain",
   );
-  assert.equal(
-    resolveTrustedClientIp("1.1.1.1, 198.51.100.7, 192.0.2.10", "2"),
-    "198.51.100.7",
-  );
-  assert.throws(() => resolveTrustedClientIp("spoofed, 203.0.113.55", "1"), TrustedClientIpError);
-  assert.throws(() => resolveTrustedClientIp("203.0.113.55", undefined), TrustedClientIpError);
+});
+
+test("SMS and email provider budgets are isolated", () => {
+  const policy = loadSmsRateLimitPolicy(environment());
+  const sms = buildSmsRateLimitRules("employer", "+989121234567", null, policy, AUTH_SECRET);
+  const email = buildSmsRateLimitRules("employer", "user@example.com", null, policy, AUTH_SECRET, "email");
+  assert.equal(sms.some((rule) => rule.key === "sms:provider:global"), true);
+  assert.equal(email.some((rule) => rule.key === "email:provider:global"), true);
 });

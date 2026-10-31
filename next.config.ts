@@ -5,6 +5,17 @@ import {
   productionSecurityHeaders,
 } from "./src/security/headers";
 
+const supportedNodeEnvironments = new Set(["development", "production", "test"]);
+
+if (
+  process.env.NODE_ENV &&
+  !supportedNodeEnvironments.has(process.env.NODE_ENV)
+) {
+  throw new Error(
+    "NODE_ENV must be one of development, production, or test. Production deployments must use NODE_ENV=production.",
+  );
+}
+
 const nextConfig: NextConfig = {
   poweredByHeader: false,
   experimental: {
