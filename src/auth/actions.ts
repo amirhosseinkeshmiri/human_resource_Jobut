@@ -17,14 +17,15 @@ import {
   getAuthSecret,
   verificationCodeMatches,
 } from "./crypto";
-import { isBoundedAuthFormData } from "./form-security";
+import { inspectBoundedAuthFormData, isBoundedAuthFormData } from "./form-security";
 import { normalizeEmployerIdentifier, normalizeVerificationCode } from "./identifier";
 import {
   ChallengeCooldownError,
   isWithinVerificationCodeCooldown,
   issueVerificationChallenge,
 } from "./issue-challenge";
-import { isTrustedAuthActionRequest } from "./request-security";
+import { logAuthFormDataRejection, logAuthOriginRejection } from "./rejection-diagnostics";
+import { inspectTrustedAuthActionRequest } from "./request-security";
 import { authorizeSmsChallenge } from "./sms/rate-limit";
 import {
   destroyEmployerSession,
@@ -49,10 +50,14 @@ export async function requestEmployerVerificationCode(
   _previousState: RequestCodeState,
   formData: FormData,
 ): Promise<RequestCodeState> {
-  if (!(await isTrustedAuthActionRequest())) {
+  const requestInspection = await inspectTrustedAuthActionRequest();
+  if (!requestInspection.trusted) {
+    logAuthOriginRejection("employer", requestInspection);
     return { status: "error", message: "درخواست ارسال کد معتبر نیست." };
   }
-  if (!isBoundedAuthFormData(formData, ["identifier"])) {
+  const formInspection = inspectBoundedAuthFormData(formData, ["identifier"]);
+  if (!formInspection.valid) {
+    logAuthFormDataRejection("employer", formInspection);
     return { status: "error", message: "درخواست ارسال کد معتبر نیست." };
   }
   const rawIdentifier = formData.get("identifier");

@@ -12,7 +12,7 @@ import {
   verificationCodeMatches,
 } from "@/auth/crypto";
 import { hasDevelopmentDelivery } from "@/auth/delivery";
-import { isBoundedAuthFormData } from "@/auth/form-security";
+import { inspectBoundedAuthFormData, isBoundedAuthFormData } from "@/auth/form-security";
 import { normalizeAuthIdentifier, normalizeVerificationCode } from "@/auth/identifier";
 import { resolveVerificationDeliveryMode } from "@/auth/delivery";
 import {
@@ -20,7 +20,8 @@ import {
   isWithinVerificationCodeCooldown,
   issueVerificationChallenge,
 } from "@/auth/issue-challenge";
-import { isTrustedAuthActionRequest } from "@/auth/request-security";
+import { logAuthFormDataRejection, logAuthOriginRejection } from "@/auth/rejection-diagnostics";
+import { inspectTrustedAuthActionRequest } from "@/auth/request-security";
 import { createOtpCorrelationId, logOtpFailure } from "@/auth/otp-diagnostics";
 import { authorizeSmsChallenge } from "@/auth/sms/rate-limit";
 import { createAdminSessionMaterial } from "@/auth/session-material";
@@ -50,10 +51,14 @@ export async function requestAdminVerificationCode(
   _previousState: AdminRequestCodeState,
   formData: FormData,
 ): Promise<AdminRequestCodeState> {
-  if (!(await isTrustedAuthActionRequest())) {
+  const requestInspection = await inspectTrustedAuthActionRequest();
+  if (!requestInspection.trusted) {
+    logAuthOriginRejection("admin", requestInspection);
     return { status: "error", message: "درخواست ارسال کد معتبر نیست." };
   }
-  if (!isBoundedAuthFormData(formData, ["identifier"])) {
+  const formInspection = inspectBoundedAuthFormData(formData, ["identifier"]);
+  if (!formInspection.valid) {
+    logAuthFormDataRejection("admin", formInspection);
     return { status: "error", message: "درخواست ارسال کد معتبر نیست." };
   }
   const rawIdentifier = formData.get("identifier");

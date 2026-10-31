@@ -6,8 +6,12 @@ import {
   verificationCodeMatches,
 } from "./crypto";
 import { normalizeEmployerIdentifier } from "./identifier";
-import { AUTH_FORM_BODY_LIMIT, isBoundedAuthFormData } from "./form-security";
-import { isExpectedAuthOrigin } from "./origin-policy";
+import {
+  AUTH_FORM_BODY_LIMIT,
+  inspectBoundedAuthFormData,
+  isBoundedAuthFormData,
+} from "./form-security";
+import { inspectExpectedAuthOrigin, isExpectedAuthOrigin } from "./origin-policy";
 import { createEmployerSessionMaterial } from "./session-material";
 
 test("normalizes employer emails", () => {
@@ -81,6 +85,21 @@ test("auth forms accept bounded Next.js Server Action metadata", () => {
   formData.set("identifier", "employer@example.com");
 
   assert.equal(isBoundedAuthFormData(formData, ["identifier"]), true);
+  assert.deepEqual(inspectBoundedAuthFormData(formData, ["identifier"]), {
+    valid: true,
+    fieldCount: 5,
+    allowedFieldCount: 1,
+    actionMetadataFieldCount: 4,
+    unexpectedFieldCount: 0,
+    rejectionReason: "none",
+  });
+});
+
+test("auth forms accept the unbound Next.js 16 Server Action field name", () => {
+  const formData = new FormData();
+  formData.set("$ACTION_ID_6008257dcc893f100c0eaae6d96f7d2b3e4384270d", "");
+  formData.set("identifier", "candidate@example.com");
+  assert.equal(isBoundedAuthFormData(formData, ["identifier"]), true);
 });
 
 test("auth forms still reject forged or oversized Server Action metadata", () => {
@@ -105,4 +124,22 @@ test("production auth origin must match the canonical HTTPS APP_URL", () => {
     false,
   );
   assert.equal(isExpectedAuthOrigin("http://localhost:3000", "http://localhost:3000"), false);
+});
+
+test("origin diagnostics reveal only structural match state", () => {
+  assert.deepEqual(
+    inspectExpectedAuthOrigin(
+      "https://jobut.ir",
+      "jobut.ir",
+      "https://www.jobut.ir",
+    ),
+    {
+      trusted: false,
+      originPresent: true,
+      hostPresent: true,
+      expectedOriginConfigured: true,
+      originMatchesExpected: false,
+      hostMatchesExpected: false,
+    },
+  );
 });

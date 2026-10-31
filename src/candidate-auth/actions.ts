@@ -13,14 +13,15 @@ import {
   getAuthSecret,
   verificationCodeMatches,
 } from "@/auth/crypto";
-import { isBoundedAuthFormData } from "@/auth/form-security";
+import { inspectBoundedAuthFormData, isBoundedAuthFormData } from "@/auth/form-security";
 import { normalizeAuthIdentifier, normalizeVerificationCode } from "@/auth/identifier";
 import {
   ChallengeCooldownError,
   isWithinVerificationCodeCooldown,
   issueVerificationChallenge,
 } from "@/auth/issue-challenge";
-import { isTrustedAuthActionRequest } from "@/auth/request-security";
+import { logAuthFormDataRejection, logAuthOriginRejection } from "@/auth/rejection-diagnostics";
+import { inspectTrustedAuthActionRequest } from "@/auth/request-security";
 import { authorizeSmsChallenge } from "@/auth/sms/rate-limit";
 import { createCandidateSessionMaterial } from "@/auth/session-material";
 import { destroyCandidateSession, setCandidateSessionCookie } from "./session";
@@ -42,10 +43,14 @@ export async function requestCandidateVerificationCode(
   _previousState: CandidateRequestCodeState,
   formData: FormData,
 ): Promise<CandidateRequestCodeState> {
-  if (!(await isTrustedAuthActionRequest())) {
+  const requestInspection = await inspectTrustedAuthActionRequest();
+  if (!requestInspection.trusted) {
+    logAuthOriginRejection("candidate", requestInspection);
     return { status: "error", message: "درخواست ارسال کد معتبر نیست." };
   }
-  if (!isBoundedAuthFormData(formData, ["identifier"])) {
+  const formInspection = inspectBoundedAuthFormData(formData, ["identifier"]);
+  if (!formInspection.valid) {
+    logAuthFormDataRejection("candidate", formInspection);
     return { status: "error", message: "درخواست ارسال کد معتبر نیست." };
   }
   const rawIdentifier = formData.get("identifier");
