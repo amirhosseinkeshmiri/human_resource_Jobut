@@ -28,6 +28,7 @@ import { createAdminSessionMaterial } from "@/auth/session-material";
 import { db } from "@/db";
 import { adminAccounts, adminAuthChallenges, adminSessions } from "@/db/schema";
 import { canCreateAdminSession, canIssueAdminChallenge } from "./policy";
+import { isAdminManagementEnabled } from "./admin-management-feature";
 import {
   ADMIN_VERIFICATION_FAILURE_MESSAGE,
   issueAdminChallengeIndistinguishably,
@@ -72,14 +73,15 @@ export async function requestAdminVerificationCode(
   const startedAt = Date.now();
   const provider = resolveVerificationDeliveryMode(identifier);
   try {
+    const accountIdentifierCondition = identifier.type === "email"
+      ? eq(adminAccounts.email, identifier.value)
+      : eq(adminAccounts.mobile, identifier.value);
     const [account] = await db
       .select({ id: adminAccounts.id })
       .from(adminAccounts)
-      .where(
-        identifier.type === "email"
-          ? eq(adminAccounts.email, identifier.value)
-          : eq(adminAccounts.mobile, identifier.value),
-      )
+      .where(isAdminManagementEnabled()
+        ? and(accountIdentifierCondition, eq(adminAccounts.status, "active"))
+        : accountIdentifierCondition)
       .limit(1);
 
     return issueAdminChallengeIndistinguishably(
@@ -215,14 +217,15 @@ export async function verifyAdminCode(
       return { error: ADMIN_VERIFICATION_FAILURE_MESSAGE } as const;
     }
 
+    const accountIdentifierCondition = challenge.identifierType === "email"
+      ? eq(adminAccounts.email, challenge.identifier)
+      : eq(adminAccounts.mobile, challenge.identifier);
     const [account] = await transaction
       .select({ id: adminAccounts.id })
       .from(adminAccounts)
-      .where(
-        challenge.identifierType === "email"
-          ? eq(adminAccounts.email, challenge.identifier)
-          : eq(adminAccounts.mobile, challenge.identifier),
-      )
+      .where(isAdminManagementEnabled()
+        ? and(accountIdentifierCondition, eq(adminAccounts.status, "active"))
+        : accountIdentifierCondition)
       .limit(1);
     if (!canCreateAdminSession(account?.id, true)) {
       await transaction.update(adminAuthChallenges).set({ consumedAt: new Date() }).where(eq(adminAuthChallenges.id, challenge.id));

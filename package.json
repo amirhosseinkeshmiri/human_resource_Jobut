@@ -28,7 +28,8 @@
     "db:generate": "drizzle-kit generate",
     "db:check": "drizzle-kit check",
     "db:migrate": "drizzle-kit migrate",
-    "db:seed": "tsx src/db/seed/industries.ts"
+    "db:seed": "tsx src/db/seed/industries.ts",
+    "admin:bootstrap-owner": "tsx scripts/bootstrap-platform-owner.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "5.9.1",
