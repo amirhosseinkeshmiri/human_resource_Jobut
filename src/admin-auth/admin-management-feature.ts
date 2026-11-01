@@ -20,3 +20,11 @@ export function isAdminAccountLoginEligible(
 ) {
   return !featureEnabled || status === "active";
 }
+
+export function shouldShowAdminManagementNavigation(input: {
+  featureEnabled: boolean;
+  status: "active" | "disabled" | null;
+  isOwner: boolean;
+}) {
+  return input.featureEnabled && input.status === "active" && input.isOwner;
+}

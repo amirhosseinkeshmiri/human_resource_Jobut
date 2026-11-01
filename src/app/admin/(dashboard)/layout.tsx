@@ -1,13 +1,27 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { logoutAdmin } from "@/admin-auth/actions";
+import {
+  isAdminManagementEnabled,
+  shouldShowAdminManagementNavigation,
+} from "@/admin-auth/admin-management-feature";
+import { readAdminAuthorizationContext } from "@/admin-auth/rbac-service";
 import { requireAdmin } from "@/admin-auth/session";
 import { Button, Container } from "@/components/ui";
 
 interface AdminLayoutProps { children: ReactNode; }
 
 export default async function AdminLayout({ children }: AdminLayoutProps) {
-  await requireAdmin();
+  const admin = await requireAdmin();
+  const managementEnabled = isAdminManagementEnabled();
+  const authorization = managementEnabled
+    ? await readAdminAuthorizationContext(admin.id)
+    : null;
+  const showAdminManagement = shouldShowAdminManagementNavigation({
+    featureEnabled: managementEnabled,
+    status: authorization?.status ?? null,
+    isOwner: authorization?.isOwner ?? false,
+  });
 
   return (
     <div className="min-h-screen bg-page lg:grid lg:grid-cols-[14rem_minmax(0,1fr)]">
@@ -21,6 +35,7 @@ export default async function AdminLayout({ children }: AdminLayoutProps) {
           <Link href="/admin/jobs" className="rounded-md px-3 py-2.5 text-sm font-semibold text-white/75 outline-none hover:bg-white/10 hover:text-white focus-visible:ring-2 focus-visible:ring-white/60">آگهی‌ها</Link>
           <Link href="/admin/employers" className="rounded-md px-3 py-2.5 text-sm font-semibold text-white/75 outline-none hover:bg-white/10 hover:text-white focus-visible:ring-2 focus-visible:ring-white/60">کارفرماها</Link>
           <Link href="/admin/sales" className="rounded-md px-3 py-2.5 text-sm font-semibold text-white/75 outline-none hover:bg-white/10 hover:text-white focus-visible:ring-2 focus-visible:ring-white/60">فروش و اعتبار</Link>
+          {showAdminManagement && <Link href="/admin/admins" className="rounded-md px-3 py-2.5 text-sm font-semibold text-white/75 outline-none hover:bg-white/10 hover:text-white focus-visible:ring-2 focus-visible:ring-white/60">مدیریت مدیران</Link>}
         </nav>
         <form action={logoutAdmin} className="mt-auto border-t border-white/10 p-4">
           <Button type="submit" variant="ghost" className="w-full justify-start text-white hover:bg-white/10 hover:text-white">خروج</Button>
@@ -38,6 +53,7 @@ export default async function AdminLayout({ children }: AdminLayoutProps) {
             <Link href="/admin/jobs" className="shrink-0 rounded-md px-3 py-2 text-xs font-semibold text-text-secondary outline-none hover:bg-action/10 hover:text-action focus-visible:ring-2 focus-visible:ring-focus">آگهی‌ها</Link>
             <Link href="/admin/employers" className="shrink-0 rounded-md px-3 py-2 text-xs font-semibold text-text-secondary outline-none hover:bg-action/10 hover:text-action focus-visible:ring-2 focus-visible:ring-focus">کارفرماها</Link>
             <Link href="/admin/sales" className="shrink-0 rounded-md px-3 py-2 text-xs font-semibold text-text-secondary outline-none hover:bg-action/10 hover:text-action focus-visible:ring-2 focus-visible:ring-focus">فروش و اعتبار</Link>
+            {showAdminManagement && <Link href="/admin/admins" className="shrink-0 rounded-md px-3 py-2 text-xs font-semibold text-text-secondary outline-none hover:bg-action/10 hover:text-action focus-visible:ring-2 focus-visible:ring-focus">مدیریت مدیران</Link>}
           </Container>
         </header>
         <main><Container width="dashboard" className="py-8 sm:py-10">{children}</Container></main>
