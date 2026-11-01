@@ -145,7 +145,13 @@ export function CompanyOnboardingForm({
         <FormField id="gallery" label="فایل‌های گالری">
           <Input name="gallery" type="file" accept="image/png,image/jpeg" multiple />
         </FormField>
-        <p className="text-helper">ذخیره فایل فعلاً فقط در محیط توسعه فعال است و برای استقرار اصلی به ارائه‌دهنده ذخیره‌سازی نیاز دارد.</p>
+        {existing && existing.imageCount > 0 ? (
+          <Label className="flex items-center gap-3 font-normal">
+            <input type="checkbox" name="removeGallery" value="true" className="size-4 accent-action" />
+            حذف همه تصاویر فعلی گالری
+          </Label>
+        ) : null}
+        <p className="text-helper">تصاویر روی فضای پایدار سرویس نگهداری می‌شوند.</p>
       </section>
 
       <div className="border-t pt-6">

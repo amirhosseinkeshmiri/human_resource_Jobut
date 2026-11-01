@@ -22,9 +22,9 @@ shown in the login UI so the flow can be exercised without a delivery provider.
 Production SMS requests also require the distributed PostgreSQL limiter migration
 and a correct `AUTH_TRUSTED_PROXY_HOPS` value for the Runflare proxy chain.
 
-Company image uploads are likewise local-development only and are ignored by
-Git. Production onboarding requires a persistent storage provider before new
-logo or gallery files can be saved.
+Company logos and gallery images are stored outside the application tree. Set
+`UPLOAD_STORAGE_DIR` to a writable persistent volume (`/app/uploads` on Runflare;
+use a dedicated temporary directory for local tests).
 
 Runflare build and runtime settings are documented in
 [`docs/runflare-deployment.md`](docs/runflare-deployment.md).

@@ -1,6 +1,10 @@
 import { pathToFileURL } from "node:url";
+import { constants, accessSync, closeSync, lstatSync, mkdirSync, openSync, realpathSync, statfsSync, unlinkSync } from "node:fs";
+import path from "node:path";
+import { randomUUID } from "node:crypto";
 
 const CALLBACK_PATH = "/api/payments/sep/callback";
+const COMPANY_MEDIA_DIRECTORY = "company-media";
 
 function readHttpsUrl(environment, name) {
   const rawValue = environment[name];
@@ -42,6 +46,38 @@ export function verifyProductionRuntime(environment = process.env) {
   if (callbackUrl.origin !== appUrl.origin || callbackUrl.pathname !== CALLBACK_PATH) {
     throw new Error("SEP_CALLBACK_URL must use APP_URL origin and the expected SEP callback path.");
   }
+
+  const uploadStorageDirectory = environment.UPLOAD_STORAGE_DIR;
+  if (!uploadStorageDirectory || !path.isAbsolute(uploadStorageDirectory)) {
+    throw new Error("UPLOAD_STORAGE_DIR must be an absolute persistent-disk path in production.");
+  }
+  const resolvedStorageDirectory = path.resolve(uploadStorageDirectory);
+  accessSync(resolvedStorageDirectory, constants.R_OK | constants.W_OK);
+  const realStorageDirectory = realpathSync(resolvedStorageDirectory);
+  if (realStorageDirectory !== resolvedStorageDirectory) {
+    throw new Error("UPLOAD_STORAGE_DIR must not be a symbolic-link alias.");
+  }
+  const companyMediaDirectory = path.join(realStorageDirectory, COMPANY_MEDIA_DIRECTORY);
+  mkdirSync(companyMediaDirectory, { recursive: true, mode: 0o750 });
+  const mediaDirectoryInfo = lstatSync(companyMediaDirectory);
+  if (!mediaDirectoryInfo.isDirectory() || mediaDirectoryInfo.isSymbolicLink()) {
+    throw new Error("UPLOAD_STORAGE_DIR/company-media must be a real directory, not a symlink.");
+  }
+  if (realpathSync(companyMediaDirectory) !== companyMediaDirectory) {
+    throw new Error("UPLOAD_STORAGE_DIR/company-media must remain inside the persistent mount.");
+  }
+  accessSync(companyMediaDirectory, constants.R_OK | constants.W_OK);
+  const probePath = path.join(companyMediaDirectory, `.jobut-write-probe-${randomUUID()}`);
+  let probeDescriptor;
+  try {
+    probeDescriptor = openSync(probePath, constants.O_CREAT | constants.O_EXCL | constants.O_WRONLY | constants.O_NOFOLLOW, 0o600);
+  } finally {
+    if (probeDescriptor !== undefined) closeSync(probeDescriptor);
+    try { unlinkSync(probePath); } catch (error) { if (error?.code !== "ENOENT") throw error; }
+  }
+  const storageStats = statfsSync(realStorageDirectory);
+  const availableBytes = storageStats.bavail * storageStats.bsize;
+  if (availableBytes < 5 * 1024 * 1024) throw new Error("UPLOAD_STORAGE_DIR has less than 5 MiB free.");
 
   if (environment.EMAIL_PROVIDER !== "smtp") {
     throw new Error("EMAIL_PROVIDER must be smtp in production.");
@@ -114,9 +150,10 @@ const invokedDirectly = process.argv[1]
 if (invokedDirectly) {
   try {
     verifyProductionRuntime();
-    console.log("Production runtime configuration verified.");
+    const storageStats = statfsSync(realpathSync(process.env.UPLOAD_STORAGE_DIR));
+    console.log(JSON.stringify({ event: "production_runtime_verified", uploadStorage: { available: true, writable: true, directory: "company-media", availableBytes: storageStats.bavail * storageStats.bsize, totalBytes: storageStats.blocks * storageStats.bsize } }));
   } catch (error) {
-    console.error(error instanceof Error ? error.message : "Production runtime configuration is invalid.");
+    console.error(JSON.stringify({ event: "production_runtime_verification_failed", code: error?.code ?? "INVALID_CONFIGURATION", message: error instanceof Error ? error.message : "Production runtime configuration is invalid." }));
     process.exitCode = 1;
   }
 }

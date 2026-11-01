@@ -8,6 +8,7 @@ const items = [
   { href: "/employer", label: "خانه", exact: true },
   { href: "/employer/packages", label: "بسته‌های فعال" },
   { href: "/employer/jobs", label: "مدیریت آگهی‌ها" },
+  { href: "/employer/onboarding", label: "پروفایل شرکت" },
 ];
 
 interface DashboardNavProps {
@@ -21,7 +22,7 @@ export function DashboardNav({ variant }: DashboardNavProps) {
     <nav
       aria-label="ناوبری محیط کارفرما"
       className={classNames(
-        variant === "desktop" ? "grid gap-1 p-3" : "grid grid-cols-3 border-t px-2",
+        variant === "desktop" ? "grid gap-1 p-3" : "grid grid-cols-4 border-t px-2",
       )}
     >
       {items.map((item) => {

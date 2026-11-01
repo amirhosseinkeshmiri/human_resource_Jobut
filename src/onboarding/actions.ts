@@ -12,8 +12,10 @@ import {
   industries,
 } from "@/db/schema";
 import {
+  deleteManagedCompanyImage,
   ImageValidationError,
-  saveDevelopmentCompanyImage,
+  ImageStorageError,
+  saveCompanyImage,
   selectedFiles,
 } from "./image-storage";
 import { validateCompanyOnboardingForm } from "./validation";
@@ -33,12 +35,23 @@ export async function saveCompanyOnboarding(
 
   const logoFiles = selectedFiles([formData.get("logo")].filter(Boolean) as FormDataEntryValue[]);
   const galleryFiles = selectedFiles(formData.getAll("gallery"));
+  const removeGallery = formData.get("removeGallery") === "true";
 
-  if (logoFiles.length > 1 || galleryFiles.length > 6) {
-    return { status: "error", message: "حداکثر یک لوگو و ۶ تصویر شرکت قابل ثبت است." };
+  if (logoFiles.length > 1 || galleryFiles.length > 6 || (removeGallery && galleryFiles.length > 0)) {
+    return { status: "error", message: removeGallery && galleryFiles.length > 0 ? "حذف گالری و بارگذاری گالری جدید را هم‌زمان انتخاب نکنید." : "حداکثر یک لوگو و ۶ تصویر شرکت قابل ثبت است." };
   }
 
+  const newlyStoredUrls: string[] = [];
   try {
+    const logoUrl = logoFiles[0] ? await saveCompanyImage(logoFiles[0], "logo") : undefined;
+    if (logoUrl) newlyStoredUrls.push(logoUrl);
+    const galleryUrls: string[] = [];
+    for (const file of galleryFiles) {
+      const url = await saveCompanyImage(file, "gallery");
+      newlyStoredUrls.push(url);
+      galleryUrls.push(url);
+    }
+
     const result = await db.transaction(async (transaction) => {
       const [[industry], validBenefits, [existingCompany]] = await Promise.all([
         transaction
@@ -68,12 +81,11 @@ export async function saveCompanyOnboarding(
       if (!existingCompany?.logoUrl && logoFiles.length === 0) {
         return { error: "انتخاب لوگوی مربع شرکت الزامی است." } as const;
       }
-      const logoUrl = logoFiles[0]
-        ? await saveDevelopmentCompanyImage(logoFiles[0], "logo")
-        : existingCompany?.logoUrl;
-      const galleryUrls = await Promise.all(
-        galleryFiles.map((file) => saveDevelopmentCompanyImage(file, "gallery")),
-      );
+      const oldLogoUrl = existingCompany?.logoUrl ?? null;
+      const nextLogoUrl = logoUrl ?? oldLogoUrl;
+      const oldGallery = existingCompany && (galleryUrls.length > 0 || removeGallery)
+        ? await transaction.select({ imageUrl: companyImages.imageUrl }).from(companyImages).where(eq(companyImages.companyId, existingCompany.id))
+        : [];
 
       const [company] = await transaction
         .insert(companies)
@@ -83,7 +95,7 @@ export async function saveCompanyOnboarding(
           name: validation.data.name,
           address: validation.data.address,
           foundingYear: validation.data.foundingYear,
-          logoUrl,
+          logoUrl: nextLogoUrl,
         })
         .onConflictDoUpdate({
           target: companies.employerAccountId,
@@ -92,7 +104,7 @@ export async function saveCompanyOnboarding(
             name: validation.data.name,
             address: validation.data.address,
             foundingYear: validation.data.foundingYear,
-            logoUrl,
+            logoUrl: nextLogoUrl,
             updatedAt: new Date(),
           },
         })
@@ -105,21 +117,31 @@ export async function saveCompanyOnboarding(
         );
       }
 
-      if (galleryUrls.length > 0) {
+      if (galleryUrls.length > 0 || removeGallery) {
         await transaction.delete(companyImages).where(eq(companyImages.companyId, company.id));
+      }
+      if (galleryUrls.length > 0) {
         await transaction.insert(companyImages).values(
           galleryUrls.map((imageUrl, sortOrder) => ({ companyId: company.id, imageUrl, sortOrder })),
         );
       }
 
-      return { success: true } as const;
+      return { success: true, oldLogoUrl: logoUrl ? oldLogoUrl : null, oldGalleryUrls: oldGallery.map((item) => item.imageUrl) } as const;
     });
 
-    if ("error" in result) return { status: "error", message: result.error };
+    if ("error" in result) {
+      await Promise.all(newlyStoredUrls.map(deleteManagedCompanyImage));
+      return { status: "error", message: result.error };
+    }
+    await Promise.all([result.oldLogoUrl, ...result.oldGalleryUrls].map(deleteManagedCompanyImage));
   } catch (error) {
+    await Promise.all(newlyStoredUrls.map(deleteManagedCompanyImage));
     if (error instanceof ImageValidationError) {
+      console.warn(JSON.stringify({ event: "image_upload_rejected", code: error.code }));
       return { status: "error", message: error.message };
     }
+    if (error instanceof ImageStorageError) return { status: "error", message: error.message };
+    console.error(JSON.stringify({ event: "image_upload_failure", code: (error as NodeJS.ErrnoException)?.code ?? "UNKNOWN" }));
     return { status: "error", message: "ثبت اطلاعات شرکت انجام نشد. دوباره تلاش کنید." };
   }
 

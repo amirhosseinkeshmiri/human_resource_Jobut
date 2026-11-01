@@ -36,6 +36,7 @@ production نیستند.
 - `AUTH_SECRET`
 - `APP_URL`
 - `ENABLE_HSTS`
+- `UPLOAD_STORAGE_DIR=/app/uploads`
 - `SEP_TERMINAL_ID`
 - `SEP_CALLBACK_URL`
 - `SMS_PROVIDER`
@@ -73,6 +74,77 @@ canonical به redirect متکی باشد.
 
 فعال‌سازی `ENABLE_HSTS=true` فقط پس از تأیید HTTPS و redirect دائمی HTTP به HTTPS
 انجام شود.
+
+## دیسک پایدار تصاویر
+
+در پنل Runflare برای application با نام `jobut` یک Persistent Disk با ظرفیت ۲ GB
+بسازید/متصل کنید و mount path را دقیقاً `/app/uploads` قرار دهید. سپس متغیر runtime
+`UPLOAD_STORAGE_DIR=/app/uploads` را ثبت کنید. این مسیر نباید به `public/`، `.next/`،
+`/tmp` یا مسیر سورس اشاره کند و نباید symlink باشد. volume باید در runtime (نه فقط
+مرحله build) روی تمام replicaهایی که upload یا serve انجام می‌دهند mount باشد؛ اگر
+Runflare یک volume را فقط به یک instance متصل می‌کند، تعداد replicaهای این سرویس باید
+با همان محدودیت سازگار تنظیم شود.
+
+فرمان start پروژه، پیش از آغاز Next.js، وجود مسیر، دسترسی خواندن/نوشتن و فضای آزاد
+را بررسی می‌کند. probe با نام تصادفی و `O_EXCL` ساخته و بلافاصله حذف می‌شود و هیچ فایل
+موجودی تغییر نمی‌کند. در نبود mount، permission نامناسب یا فضای آزاد کمتر از ۵ MiB،
+سرویس fail-closed شروع نمی‌شود. خروجی موفق یک JSON با event
+`production_runtime_verified` و `availableBytes` است؛ secret یا نام فایل‌ها log
+نمی‌شوند. زیرشاخه `company-media` در startup با permission محدود ساخته یا بررسی می‌شود
+و probe نوشتن نیز داخل همین زیرشاخه انجام می‌شود.
+
+در تنظیمات application، Start Command باید دقیقاً `npm run start` (یا `npm start`)
+باشد. npm در هر دو حالت lifecycle مربوط به `prestart` را اجرا می‌کند؛ اجرای مستقیم
+`next start` یا یک فرمان سفارشی دیگر این guard را دور می‌زند. مستندات عمومی Runflare
+امکان start/restart و مشاهده log را بیان می‌کند، اما فرمان واقعی application را تضمین
+نمی‌کند؛ بنابراین مقدار Start Command باید در پنل خود application بازبینی شود و وجود
+event برابر `production_runtime_verified` در log هر boot معیار قطعی اجرای guard است.
+
+ستون‌های موجود `companies.logo_url` و `company_images.image_url` حفظ شده‌اند و اکنون
+URLهایی مانند `/api/images/company-media/<random-name>.png` نگه می‌دارند؛ بنابراین
+migration پایگاه داده لازم نیست. URLهای قدیمی بدون تغییر باقی می‌مانند و تا زمانی که
+منبع قبلی‌شان موجود باشد backward-compatible هستند. فایل‌های موجود production نباید
+دستی جابه‌جا یا حذف شوند.
+
+### ترتیب استقرار دستی
+
+1. پیش از deploy، disk دو گیگابایتی را mount و environment بالا را ثبت کنید.
+2. release را با همان Install/Build/Start Commandهای ابتدای سند بسازید؛ migration
+   جدیدی برای این تغییر اجرا نکنید.
+3. log آغاز سرویس را برای event موفق و مقدار منطقی `availableBytes` بررسی کنید. مقدار
+   نزدیک به ظرفیت ۲ GB (با کسر overhead filesystem) انتظار می‌رود.
+
+   ```bash
+   findmnt -T /app/uploads
+   test -d /app/uploads/company-media -a -r /app/uploads/company-media -a -w /app/uploads/company-media
+   df -h /app/uploads
+   ```
+
+   `findmnt` باید volume مورد انتظار را نشان دهد؛ صرف وجود یک directory هم‌نام برای
+   اثبات persistent بودن کافی نیست. JSON موفق startup علاوه بر `availableBytes`، مقدار
+   `totalBytes` را نیز برای تطبیق تقریبی با disk دو گیگابایتی گزارش می‌کند.
+4. با حساب کارفرمای آزمایشی وارد `/employer/onboarding` شوید؛ لوگوی مربع PNG/JPEG
+   زیر ۵ MB بفرستید و ذخیره موفق و نمایش لوگو در داشبورد/صفحه آگهی را بررسی کنید.
+5. حداکثر شش تصویر گالری بفرستید. پاسخ URL تصویر باید `200`، `Content-Type` درست،
+   `X-Content-Type-Options: nosniff` و cache immutable داشته باشد. یک نام ساختگی یا
+   traversal باید `404` بدهد.
+6. لوگوی دیگری انتخاب و ذخیره کنید؛ URL باید عوض شود و تصویر جدید نمایش داده شود.
+   برای حذف گالری، گزینه «حذف همه تصاویر فعلی گالری» را انتخاب کنید. پس از commit
+   دیتابیس، فایل‌های superseded پاک می‌شوند؛ فایل قبلی پیش از commit حذف نمی‌شود.
+7. application را restart کنید و همان URL جدید را دوباره با `curl -I`/مرورگر بررسی
+   کنید. سپس یک redeploy بدون حذف volume انجام دهید و همان بررسی را تکرار کنید؛ URL و
+   محتوا باید همچنان در دسترس باشند.
+8. برای کنترل ظرفیت، log startup و dashboard دیسک Runflare را بررسی کنید. رخدادهای
+   `ENOSPC`، permission و validation با eventهای ساختاریافته و بدون داده حساس ثبت
+   می‌شوند.
+
+نمونه smoke test پس از داشتن URL واقعی:
+
+```bash
+curl -fsSI 'https://www.jobut.ir/api/images/company-media/<filename>'
+curl -sS -o /dev/null -w '%{http_code}\n' \
+  'https://www.jobut.ir/api/images/company-media/../../etc/passwd'
+```
 
 برای `AUTH_TRUSTED_PROXY_HOPS` مقدار نمونه یا حدسی استفاده نشود. تعداد proxyهای مورد
 اعتماد که Runflare به سمت راست `X-Forwarded-For` اضافه می‌کند باید ابتدا با پشتیبانی

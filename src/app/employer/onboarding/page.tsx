@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import { redirect } from "next/navigation";
 import { requireEmployer } from "@/auth/session";
 import { CompanyOnboardingForm } from "@/components/onboarding/company-onboarding-form";
 import { Card, Container } from "@/components/ui";
@@ -19,8 +18,6 @@ export default async function EmployerOnboardingPage() {
     getEmployerCompanyOnboarding(employer.id),
     getOnboardingReferenceData(),
   ]);
-
-  if (onboarding.complete) redirect("/employer");
 
   const existing = onboarding.company
     ? {

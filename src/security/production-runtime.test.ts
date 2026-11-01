@@ -1,13 +1,17 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
+import { chmodSync, existsSync, mkdtempSync, mkdirSync, symlinkSync } from "node:fs";
+import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
 
 const script = path.join(process.cwd(), "scripts", "verify-production-runtime.mjs");
+const uploadStorageDirectory = mkdtempSync(path.join(tmpdir(), "jobut-runtime-storage-"));
 const validEnvironment = {
   NODE_ENV: "production",
   APP_URL: "https://www.jobut.ir",
   SEP_CALLBACK_URL: "https://www.jobut.ir/api/payments/sep/callback",
+  UPLOAD_STORAGE_DIR: uploadStorageDirectory,
   EMAIL_PROVIDER: "smtp",
   EMAIL_FROM: "no-reply@jobut.ir",
   SMTP_HOST: "smtp.example.com",
@@ -39,6 +43,7 @@ function verify(overrides: Record<string, string | undefined>) {
 
 test("accepts the canonical HTTPS production configuration", () => {
   assert.equal(verify({}).status, 0);
+  assert.equal(existsSync(path.join(uploadStorageDirectory, "company-media")), true);
 });
 
 test("rejects non-production runtime modes", () => {
@@ -60,6 +65,27 @@ test("rejects a SEP callback on a different origin", () => {
 
 test("rejects production runtime without SMTP delivery", () => {
   const result = verify({ EMAIL_PROVIDER: "" });
+  assert.notEqual(result.status, 0);
+});
+
+test("rejects production runtime without a mounted upload directory", () => {
+  const result = verify({ UPLOAD_STORAGE_DIR: "/definitely-missing-jobut-storage" });
+  assert.notEqual(result.status, 0);
+});
+
+test("rejects an upload directory without write permission", () => {
+  const root = mkdtempSync(path.join(tmpdir(), "jobut-runtime-readonly-"));
+  chmodSync(root, 0o500);
+  const result = verify({ UPLOAD_STORAGE_DIR: root });
+  assert.notEqual(result.status, 0);
+});
+
+test("rejects a symlinked company-media directory", () => {
+  const root = mkdtempSync(path.join(tmpdir(), "jobut-runtime-symlink-"));
+  const outside = mkdtempSync(path.join(tmpdir(), "jobut-runtime-outside-"));
+  mkdirSync(outside, { recursive: true });
+  symlinkSync(outside, path.join(root, "company-media"));
+  const result = verify({ UPLOAD_STORAGE_DIR: root });
   assert.notEqual(result.status, 0);
 });
 

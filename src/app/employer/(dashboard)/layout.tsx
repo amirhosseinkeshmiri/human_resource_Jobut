@@ -1,4 +1,3 @@
-import Image from "next/image";
 import type { ReactNode } from "react";
 import { logoutEmployer } from "@/auth/actions";
 import { DashboardNav } from "@/components/dashboard/dashboard-nav";
@@ -11,20 +10,13 @@ interface EmployerDashboardLayoutProps {
 
 export default async function EmployerDashboardLayout({ children }: EmployerDashboardLayoutProps) {
   const { company } = await getEmployerDashboardContext();
-  const developmentLogo =
-    process.env.NODE_ENV !== "production" && company.logoUrl?.startsWith("/dev-uploads/")
-      ? company.logoUrl
-      : null;
-
   const identity = (
     <div className="flex min-w-0 items-center gap-3">
-      {developmentLogo ? (
-        <Image
-          src={developmentLogo}
+      {company.logoUrl ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={company.logoUrl}
           alt={`لوگوی ${company.name}`}
-          width={40}
-          height={40}
-          unoptimized
           className="size-10 shrink-0 rounded-md border object-cover"
         />
       ) : null}

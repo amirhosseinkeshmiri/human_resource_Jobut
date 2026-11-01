@@ -1,48 +1,53 @@
 import "server-only";
-import { mkdir, writeFile } from "node:fs/promises";
+import { constants } from "node:fs";
+import { access, lstat, mkdir, open, realpath, statfs, unlink } from "node:fs/promises";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
+import sharp from "sharp";
 
-const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
-const allowedTypes = new Map([
-  ["image/png", "png"],
-  ["image/jpeg", "jpg"],
-]);
+export const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
+export const MAX_IMAGE_PIXELS = 25_000_000;
+export const IMAGE_ROUTE_PREFIX = "/api/images/company-media/";
+const storageSubdirectory = "company-media";
+const managedFilename = /^(logo|gallery)-[0-9a-f]{8}-[0-9a-f-]{27,}\.(png|jpg)$/;
+const formats = { png: { extension: "png", contentType: "image/png" }, jpeg: { extension: "jpg", contentType: "image/jpeg" } } as const;
 
-export class ImageValidationError extends Error {}
-
-function readPngDimensions(buffer: Buffer) {
-  const pngSignature = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
-  if (buffer.length < 24 || !buffer.subarray(0, 8).equals(pngSignature)) return null;
-  return { width: buffer.readUInt32BE(16), height: buffer.readUInt32BE(20) };
+export class ImageValidationError extends Error {
+  constructor(message: string, readonly code = "IMAGE_VALIDATION") { super(message); this.name = "ImageValidationError"; }
+}
+export class ImageStorageError extends Error {
+  constructor(message: string, readonly code: string, options?: ErrorOptions) { super(message, options); this.name = "ImageStorageError"; }
 }
 
-function readJpegDimensions(buffer: Buffer) {
-  if (buffer.length < 4 || buffer[0] !== 0xff || buffer[1] !== 0xd8) return null;
-  let offset = 2;
-
-  while (offset + 8 < buffer.length) {
-    if (buffer[offset] !== 0xff) {
-      offset += 1;
-      continue;
-    }
-    const marker = buffer[offset + 1];
-    const length = buffer.readUInt16BE(offset + 2);
-    if (length < 2 || offset + length + 2 > buffer.length) return null;
-    if ([0xc0, 0xc1, 0xc2, 0xc3, 0xc5, 0xc6, 0xc7, 0xc9, 0xca, 0xcb, 0xcd, 0xce, 0xcf].includes(marker)) {
-      return {
-        height: buffer.readUInt16BE(offset + 5),
-        width: buffer.readUInt16BE(offset + 7),
-      };
-    }
-    offset += length + 2;
+function storageRoot() {
+  const configured = process.env.UPLOAD_STORAGE_DIR?.trim();
+  if (!configured || !path.isAbsolute(configured)) {
+    throw new ImageStorageError("UPLOAD_STORAGE_DIR باید یک مسیر مطلق برای دیسک پایدار باشد.", "STORAGE_NOT_CONFIGURED");
   }
-
-  return null;
+  return path.resolve(configured);
 }
 
-function imageDimensions(buffer: Buffer, type: string) {
-  return type === "image/png" ? readPngDimensions(buffer) : readJpegDimensions(buffer);
+function logStorageFailure(operation: string, error: unknown) {
+  const nodeError = error as NodeJS.ErrnoException;
+  console.error(JSON.stringify({ event: "image_storage_failure", operation, code: error instanceof ImageStorageError || error instanceof ImageValidationError ? error.code : nodeError?.code ?? "UNKNOWN" }));
+}
+
+async function mediaDirectory(create = false) {
+  const root = storageRoot();
+  await access(root, constants.R_OK | constants.W_OK);
+  const rootReal = await realpath(root);
+  const requested = path.join(rootReal, storageSubdirectory);
+  if (create) await mkdir(requested, { recursive: true, mode: 0o750 });
+  const info = await lstat(requested);
+  if (!info.isDirectory() || info.isSymbolicLink()) throw new ImageStorageError("مسیر ذخیره تصاویر امن نیست.", "UNSAFE_STORAGE_PATH");
+  const directoryReal = await realpath(requested);
+  if (path.dirname(directoryReal) !== rootReal) throw new ImageStorageError("مسیر ذخیره تصاویر خارج از دیسک مجاز است.", "STORAGE_PATH_ESCAPE");
+  return directoryReal;
+}
+
+function checkedFilename(filename: string) {
+  if (!managedFilename.test(filename) || path.basename(filename) !== filename) throw new ImageStorageError("شناسه تصویر معتبر نیست.", "INVALID_IMAGE_PATH");
+  return filename;
 }
 
 export function selectedFiles(entries: FormDataEntryValue[]) {
@@ -53,37 +58,69 @@ export async function validateCompanyImageFile(
   file: File,
   kind: "logo" | "gallery",
 ) {
-  const extension = allowedTypes.get(file.type);
-  if (!extension || file.size > MAX_IMAGE_BYTES) {
-    throw new ImageValidationError("تصویر باید PNG یا JPEG و حداکثر ۵ مگابایت باشد.");
-  }
-
+  if (file.size < 1 || file.size > MAX_IMAGE_BYTES) throw new ImageValidationError("حجم تصویر باید حداکثر ۵ مگابایت باشد.", "IMAGE_SIZE");
   const buffer = Buffer.from(await file.arrayBuffer());
-  const dimensions = imageDimensions(buffer, file.type);
-  if (!dimensions || dimensions.width < 1 || dimensions.height < 1) {
-    throw new ImageValidationError("فایل تصویر معتبر نیست.");
+  try {
+    const image = sharp(buffer, { failOn: "error", limitInputPixels: MAX_IMAGE_PIXELS });
+    const metadata = await image.metadata();
+    const format = metadata.format === "png" || metadata.format === "jpeg" ? formats[metadata.format] : null;
+    if (!format || !metadata.width || !metadata.height || (metadata.pages !== undefined && metadata.pages !== 1)) throw new ImageValidationError("فقط تصویر تک‌فریم PNG یا JPEG معتبر پذیرفته می‌شود.", "IMAGE_FORMAT");
+    if (metadata.width > 6000 || metadata.height > 6000 || metadata.width * metadata.height > MAX_IMAGE_PIXELS) throw new ImageValidationError("ابعاد تصویر بیش از حد مجاز است.", "IMAGE_DIMENSIONS");
+    if (kind === "logo" && metadata.width !== metadata.height) throw new ImageValidationError("لوگوی شرکت باید نسبت تصویر ۱:۱ داشته باشد.", "LOGO_ASPECT_RATIO");
+    await image.clone().raw().toBuffer();
+    return { buffer, ...format };
+  } catch (error) {
+    if (error instanceof ImageValidationError) throw error;
+    throw new ImageValidationError("فایل تصویر معتبر نیست.", "IMAGE_DECODE");
   }
-  if (kind === "logo" && dimensions.width !== dimensions.height) {
-    throw new ImageValidationError("لوگوی شرکت باید نسبت تصویر ۱:۱ داشته باشد.");
-  }
-
-  return { buffer, extension };
 }
 
-export async function saveDevelopmentCompanyImage(
-  file: File,
-  kind: "logo" | "gallery",
-) {
-  if (process.env.NODE_ENV === "production") {
-    throw new ImageValidationError("ذخیره‌سازی تصویر هنوز برای محیط اصلی پیکربندی نشده است.");
-  }
-
+export async function saveCompanyImage(file: File, kind: "logo" | "gallery") {
   const { buffer, extension } = await validateCompanyImageFile(file, kind);
+  let handle;
+  let target: string | undefined;
+  try {
+    const directory = await mediaDirectory(true);
+    const filename = `${kind}-${randomUUID()}.${extension}`;
+    target = path.join(directory, filename);
+    handle = await open(target, constants.O_CREAT | constants.O_EXCL | constants.O_WRONLY | constants.O_NOFOLLOW, 0o640);
+    await handle.writeFile(buffer);
+    await handle.sync();
+    return `${IMAGE_ROUTE_PREFIX}${filename}`;
+  } catch (error) {
+    await handle?.close().catch(() => undefined);
+    handle = undefined;
+    if (target) await unlink(target).catch(() => undefined);
+    logStorageFailure("write", error);
+    const code = (error as NodeJS.ErrnoException)?.code;
+    throw new ImageStorageError(code === "ENOSPC" ? "فضای دیسک ذخیره تصاویر کافی نیست." : "ذخیره تصویر روی دیسک پایدار انجام نشد.", code ?? "STORAGE_WRITE_FAILED", { cause: error });
+  } finally {
+    await handle?.close();
+  }
+}
 
-  const directory = path.join(process.cwd(), "public", "dev-uploads", "company-media");
-  await mkdir(directory, { recursive: true });
-  const filename = `${kind}-${randomUUID()}.${extension}`;
-  await writeFile(path.join(directory, filename), buffer, { flag: "wx" });
+export function filenameFromManagedUrl(url: string | null | undefined) {
+  if (!url?.startsWith(IMAGE_ROUTE_PREFIX)) return null;
+  try { return checkedFilename(url.slice(IMAGE_ROUTE_PREFIX.length)); } catch { return null; }
+}
 
-  return `/dev-uploads/company-media/${filename}`;
+export async function readCompanyImage(filename: string) {
+  const safeName = checkedFilename(filename);
+  const directory = await mediaDirectory(false);
+  const handle = await open(path.join(directory, safeName), constants.O_RDONLY | constants.O_NOFOLLOW);
+  try { return await handle.readFile(); } finally { await handle.close(); }
+}
+
+export async function deleteManagedCompanyImage(url: string | null | undefined) {
+  const filename = filenameFromManagedUrl(url);
+  if (!filename) return;
+  try { await unlink(path.join(await mediaDirectory(false), filename)); }
+  catch (error) { if ((error as NodeJS.ErrnoException)?.code !== "ENOENT") logStorageFailure("delete", error); }
+}
+
+export async function getStorageDiagnostics() {
+  const root = storageRoot();
+  await access(root, constants.R_OK | constants.W_OK);
+  const stats = await statfs(root);
+  return { root, availableBytes: stats.bavail * stats.bsize, totalBytes: stats.blocks * stats.bsize };
 }
