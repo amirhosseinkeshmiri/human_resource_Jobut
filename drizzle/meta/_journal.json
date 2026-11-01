@@ -127,6 +127,13 @@
       "when": 1793429739534,
       "tag": "0017_glorious_gravity",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1793520116531,
+      "tag": "0018_giant_tana_nile",
+      "breakpoints": true
     }
   ]
 }

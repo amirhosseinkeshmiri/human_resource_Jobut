@@ -4,8 +4,10 @@ import {
   bigint,
   check,
   date,
+  foreignKey,
   index,
   integer,
+  jsonb,
   pgEnum,
   pgTable,
   primaryKey,
@@ -15,6 +17,7 @@ import {
   uuid,
   varchar,
 } from "drizzle-orm/pg-core";
+import { adminPermissions } from "../../admin-auth/permissions";
 
 const timestamps = {
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
@@ -798,12 +801,26 @@ export const candidateSessionRelations = relations(candidateSessions, ({ one }) 
   }),
 }));
 
+export const adminAccountStatus = pgEnum("admin_account_status", ["active", "disabled"]);
+
+export const adminPermissionCode = pgEnum("admin_permission_code", adminPermissions);
+
+export const adminAuditOutcome = pgEnum("admin_audit_outcome", [
+  "succeeded",
+  "failed",
+  "denied",
+]);
+
 export const adminAccounts = pgTable(
   "admin_accounts",
   {
     id: uuid("id").defaultRandom().primaryKey(),
     email: varchar("email", { length: 320 }).unique(),
     mobile: varchar("mobile", { length: 20 }).unique(),
+    status: adminAccountStatus("status").default("active").notNull(),
+    disabledAt: timestamp("disabled_at", { withTimezone: true }),
+    disabledByAdminAccountId: uuid("disabled_by_admin_account_id"),
+    disableReason: varchar("disable_reason", { length: 500 }),
     ...timestamps,
   },
   (table) => [
@@ -811,6 +828,86 @@ export const adminAccounts = pgTable(
       "admin_accounts_contact_check",
       sql`${table.email} is not null or ${table.mobile} is not null`,
     ),
+    check(
+      "admin_accounts_status_details_check",
+      sql`(${table.status} = 'active' and ${table.disabledAt} is null and ${table.disabledByAdminAccountId} is null and ${table.disableReason} is null) or (${table.status} = 'disabled' and ${table.disabledAt} is not null and ${table.disabledByAdminAccountId} is not null and char_length(${table.disableReason}) between 1 and 500)`,
+    ),
+    foreignKey({
+      name: "admin_accounts_disabled_by_fk",
+      columns: [table.disabledByAdminAccountId],
+      foreignColumns: [table.id],
+    }).onDelete("restrict"),
+  ],
+);
+
+export const platformOwner = pgTable(
+  "platform_owner",
+  {
+    singletonKey: boolean("singleton_key").default(true).primaryKey(),
+    adminAccountId: uuid("admin_account_id")
+      .notNull()
+      .unique()
+      .references(() => adminAccounts.id, { onDelete: "restrict" }),
+    provisionedAt: timestamp("provisioned_at", { withTimezone: true }).defaultNow().notNull(),
+    provisionedByReference: varchar("provisioned_by_reference", { length: 200 }).notNull(),
+  },
+  (table) => [
+    check("platform_owner_singleton_check", sql`${table.singletonKey} = true`),
+    check(
+      "platform_owner_reference_check",
+      sql`char_length(btrim(${table.provisionedByReference})) between 1 and 200`,
+    ),
+  ],
+);
+
+export const adminAccountPermissions = pgTable(
+  "admin_account_permissions",
+  {
+    adminAccountId: uuid("admin_account_id")
+      .notNull()
+      .references(() => adminAccounts.id, { onDelete: "cascade" }),
+    permissionCode: adminPermissionCode("permission_code").notNull(),
+    grantedByAdminAccountId: uuid("granted_by_admin_account_id")
+      .notNull()
+      .references(() => adminAccounts.id, { onDelete: "restrict" }),
+    grantedAt: timestamp("granted_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    primaryKey({
+      name: "admin_account_permissions_pk",
+      columns: [table.adminAccountId, table.permissionCode],
+    }),
+    index("admin_account_permissions_permission_idx").on(table.permissionCode),
+    index("admin_account_permissions_granted_by_idx").on(table.grantedByAdminAccountId),
+  ],
+);
+
+export const adminAuditEvents = pgTable(
+  "admin_audit_events",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    actorAdminAccountId: uuid("actor_admin_account_id")
+      .references(() => adminAccounts.id, { onDelete: "restrict" }),
+    action: varchar("action", { length: 100 }).notNull(),
+    targetType: varchar("target_type", { length: 80 }).notNull(),
+    targetId: varchar("target_id", { length: 160 }),
+    outcome: adminAuditOutcome("outcome").notNull(),
+    metadataJson: jsonb("metadata_json")
+      .$type<Record<string, unknown>>()
+      .default(sql`'{}'::jsonb`)
+      .notNull(),
+    correlationId: uuid("correlation_id").notNull(),
+    occurredAt: timestamp("occurred_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("admin_audit_events_actor_time_idx").on(table.actorAdminAccountId, table.occurredAt),
+    index("admin_audit_events_action_time_idx").on(table.action, table.occurredAt),
+    index("admin_audit_events_target_time_idx").on(table.targetType, table.targetId, table.occurredAt),
+    index("admin_audit_events_correlation_idx").on(table.correlationId),
+    index("admin_audit_events_occurred_at_idx").on(table.occurredAt),
+    check("admin_audit_events_action_check", sql`char_length(btrim(${table.action})) between 1 and 100`),
+    check("admin_audit_events_target_type_check", sql`char_length(btrim(${table.targetType})) between 1 and 80`),
+    check("admin_audit_events_target_id_check", sql`${table.targetId} is null or char_length(btrim(${table.targetId})) between 1 and 160`),
   ],
 );
 
