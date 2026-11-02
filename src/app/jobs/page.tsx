@@ -32,15 +32,17 @@ export const metadata: Metadata = {
 };
 
 interface PageProps {
-  searchParams: Promise<PublicJobSearchParams>;
+  searchParams: Promise<PublicJobSearchParams & { application?: string | string[] }>;
 }
 
 const numberFormatter = new Intl.NumberFormat("fa-IR");
 
 export default async function PublicJobsPage({ searchParams }: PageProps) {
-  const filters = parsePublicJobFilters(await searchParams);
+  const query = await searchParams;
+  const filters = parsePublicJobFilters(query);
   const { jobs, total, page, pageCount } = await getPublicJobs(filters);
   const filtered = hasPublicJobFilters(filters);
+  const applicationOutcome = Array.isArray(query.application) ? query.application[0] : query.application;
 
   return (
     <>
@@ -55,6 +57,8 @@ export default async function PublicJobsPage({ searchParams }: PageProps) {
         </section>
 
         <Container className="py-[var(--section-spacing)]">
+          {applicationOutcome === "unavailable" ? <p role="alert" className="mb-5 rounded-md border border-warning/30 bg-warning/5 p-3 text-sm font-semibold text-warning">این فرصت شغلی دیگر برای ارسال درخواست در دسترس نیست.</p> : null}
+          {applicationOutcome === "invalid" ? <p role="alert" className="mb-5 rounded-md border border-danger/30 bg-danger/5 p-3 text-sm font-semibold text-danger">درخواست ارسال‌شده معتبر نبود. لطفاً فرصت شغلی را دوباره انتخاب کنید.</p> : null}
           <Card className="shadow-none">
             <form action="/jobs" method="get" className="grid gap-4 lg:grid-cols-5 lg:items-end">
               <FormField id="job-search-q" label="عنوان آگهی یا نام شرکت" className="lg:col-span-2">

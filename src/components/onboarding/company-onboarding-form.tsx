@@ -1,12 +1,13 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useEffect, useMemo, useRef } from "react";
 import { useFormStatus } from "react-dom";
 import {
   saveCompanyOnboarding,
   type OnboardingActionState,
 } from "@/onboarding/actions";
 import { Button, FormField, Input, Label, Select, Textarea } from "@/components/ui";
+import { clearFormDraft, loadFormDraft, saveFormDraft, type FormDraftOptions } from "@/forms/form-draft";
 
 interface Option {
   id: string;
@@ -21,6 +22,8 @@ interface ExistingCompanyValues {
   hasLogo: boolean;
   imageCount: number;
   benefitIds: string[];
+  id: string;
+  updatedAt: Date;
 }
 
 interface CompanyOnboardingFormProps {
@@ -28,9 +31,37 @@ interface CompanyOnboardingFormProps {
   benefits: Option[];
   existing: ExistingCompanyValues | null;
   maximumFoundingYear: number;
+  employerAccountId: string;
 }
 
 const initialState: OnboardingActionState = { status: "idle" };
+const COMPANY_DRAFT_FIELDS = ["name", "industryId", "address", "foundingYear", "benefitIds"] as const;
+
+function readEligibleValues(form: HTMLFormElement) {
+  const data = new FormData(form);
+  return {
+    name: String(data.get("name") ?? ""),
+    industryId: String(data.get("industryId") ?? ""),
+    address: String(data.get("address") ?? ""),
+    foundingYear: String(data.get("foundingYear") ?? ""),
+    benefitIds: data.getAll("benefitIds").map(String),
+  };
+}
+
+function applyEligibleValues(form: HTMLFormElement, values: Record<string, unknown>) {
+  for (const field of ["name", "industryId", "address", "foundingYear"] as const) {
+    const control = form.elements.namedItem(field);
+    if (control instanceof HTMLInputElement || control instanceof HTMLTextAreaElement || control instanceof HTMLSelectElement) {
+      if (typeof values[field] === "string") control.value = values[field];
+    }
+  }
+  const selectedBenefits = Array.isArray(values.benefitIds)
+    ? new Set(values.benefitIds.filter((value): value is string => typeof value === "string"))
+    : new Set<string>();
+  for (const checkbox of form.querySelectorAll<HTMLInputElement>('input[name="benefitIds"]')) {
+    checkbox.checked = selectedBenefits.has(checkbox.value);
+  }
+}
 
 function SubmitButton() {
   const { pending } = useFormStatus();
@@ -46,11 +77,71 @@ export function CompanyOnboardingForm({
   benefits,
   existing,
   maximumFoundingYear,
+  employerAccountId,
 }: CompanyOnboardingFormProps) {
   const [state, action] = useActionState(saveCompanyOnboarding, initialState);
+  const formRef = useRef<HTMLFormElement>(null);
+  const userEditedRef = useRef(false);
+  const pendingSaveRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const draftOptions = useMemo<FormDraftOptions>(() => ({
+    scope: {
+      accountId: employerAccountId,
+      formId: "company-profile",
+      entityId: existing?.id ?? "new",
+    },
+    allowedFields: COMPANY_DRAFT_FIELDS,
+  }), [employerAccountId, existing?.id]);
+  const initialEligibleValues = useMemo(() => ({
+    name: existing?.name ?? "",
+    industryId: existing?.industryId ?? "",
+    address: existing?.address ?? "",
+    foundingYear: existing?.foundingYear === null || existing?.foundingYear === undefined ? "" : String(existing.foundingYear),
+    benefitIds: existing?.benefitIds ?? [],
+  }), [existing]);
+
+  useEffect(() => {
+    const form = formRef.current;
+    if (!form || userEditedRef.current) return;
+    const draft = loadFormDraft<Record<string, unknown>>(
+      window.localStorage,
+      draftOptions,
+      existing?.updatedAt.getTime() ?? 0,
+    );
+    if (draft && !userEditedRef.current) applyEligibleValues(form, draft.values);
+  }, [draftOptions, existing?.updatedAt]);
+
+  useEffect(() => {
+    const form = formRef.current;
+    if (!form) return;
+    const persist = () => {
+      userEditedRef.current = true;
+      if (pendingSaveRef.current) clearTimeout(pendingSaveRef.current);
+      pendingSaveRef.current = setTimeout(() => {
+        saveFormDraft(window.localStorage, draftOptions, readEligibleValues(form));
+        pendingSaveRef.current = undefined;
+      }, 350);
+    };
+    form.addEventListener("input", persist);
+    form.addEventListener("change", persist);
+    return () => {
+      if (pendingSaveRef.current) clearTimeout(pendingSaveRef.current);
+      form.removeEventListener("input", persist);
+      form.removeEventListener("change", persist);
+    };
+  }, [draftOptions]);
+
+  function discardDraft() {
+    if (pendingSaveRef.current) {
+      clearTimeout(pendingSaveRef.current);
+      pendingSaveRef.current = undefined;
+    }
+    clearFormDraft(window.localStorage, draftOptions.scope);
+    const form = formRef.current;
+    if (form) applyEligibleValues(form, initialEligibleValues);
+  }
 
   return (
-    <form action={action} className="grid gap-6" encType="multipart/form-data">
+    <form ref={formRef} action={action} className="grid gap-6" encType="multipart/form-data">
       {state.status === "error" ? (
         <div role="alert" className="rounded-md border border-danger/30 bg-danger/10 p-3 text-sm text-danger">
           {state.message}
@@ -152,9 +243,11 @@ export function CompanyOnboardingForm({
           </Label>
         ) : null}
         <p className="text-helper">تصاویر روی فضای پایدار سرویس نگهداری می‌شوند.</p>
+        <p className="text-helper">فایل‌های انتخاب‌شده در پیش‌نویس محلی ذخیره نمی‌شوند و پس از بازخوانی صفحه باید دوباره انتخاب شوند.</p>
       </section>
 
-      <div className="border-t pt-6">
+      <div className="flex flex-col-reverse gap-3 border-t pt-6 sm:flex-row sm:justify-end">
+        <Button type="button" variant="ghost" onClick={discardDraft}>حذف پیش‌نویس محلی</Button>
         <SubmitButton />
       </div>
     </form>

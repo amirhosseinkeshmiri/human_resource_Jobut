@@ -30,7 +30,7 @@ interface JobPageProps {
 }
 
 export default async function JobPage({ params, searchParams }: JobPageProps) {
-  const [{ jobId }, query, { company }] = await Promise.all([params, searchParams, getEmployerDashboardContext()]);
+  const [{ jobId }, query, { company, employer }] = await Promise.all([params, searchParams, getEmployerDashboardContext()]);
   if (!UUID_PATTERN.test(jobId)) notFound();
   const [job, remainingJobCredits, applicationCount] = await Promise.all([
     getCompanyJobPost(company.id, jobId),
@@ -79,6 +79,11 @@ export default async function JobPage({ params, searchParams }: JobPageProps) {
             submitLabel="ذخیره تغییرات"
             serverError={errorMessage}
             initialValues={{ ...job, description: sanitizeJobDescription(job.description) }}
+            draftAccountId={employer.id}
+            draftEntityId={job.id}
+            draftBaselineUpdatedAt={job.updatedAt.getTime()}
+            clearDraftEntityId={query.created === "1" ? "new" : undefined}
+            submissionSucceeded={query.updated === "1"}
           />
         ) : (
           <div className="grid gap-6">

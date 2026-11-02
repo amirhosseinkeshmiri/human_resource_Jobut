@@ -43,7 +43,7 @@ export async function createCandidateApplication(
     if (!isStoredResumeComplete({ ...resume, experiences, educations, languages })) return "resume-required";
 
     const [job] = await tx.select({ id: jobPosts.id }).from(jobPosts)
-      .where(and(eq(jobPosts.id, jobPostId), publicJobConditions(now))).limit(1);
+      .where(and(eq(jobPosts.id, jobPostId), publicJobConditions(now))).limit(1).for("share");
     if (!job) return "job-unavailable";
 
     const [inserted] = await tx.insert(jobApplications).values(

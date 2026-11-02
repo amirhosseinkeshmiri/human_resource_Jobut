@@ -22,8 +22,12 @@ const ids = {
   companyB: "31000000-0000-4000-8000-000000000002",
   candidateA: "71000000-0000-4000-8000-000000000001",
   candidateB: "71000000-0000-4000-8000-000000000002",
+  candidateNoResume: "71000000-0000-4000-8000-000000000003",
+  candidateInvalidResume: "71000000-0000-4000-8000-000000000004",
   job: "61000000-0000-4000-8000-000000000001",
   jobConcurrent: "61000000-0000-4000-8000-000000000002",
+  jobClosed: "61000000-0000-4000-8000-000000000003",
+  jobRollback: "61000000-0000-4000-8000-000000000004",
 };
 const originalResume: CandidateResumeValues = {
   firstName: "سارا", lastName: "آزمایشی", city: "تهران", professionalTitle: "مهندس نرم‌افزار",
@@ -38,10 +42,11 @@ before(async () => {
   await sql`insert into industries (id, name, slug) values (${ids.industry}, 'Snapshot Integration', 'snapshot-integration')`;
   await sql`insert into employer_accounts (id, mobile) values (${ids.employerA}, '+989120000011'), (${ids.employerB}, '+989120000012')`;
   await sql`insert into companies (id, employer_account_id, industry_id, name, address, founding_year) values (${ids.companyA}, ${ids.employerA}, ${ids.industry}, 'Company A', 'Test', 1400), (${ids.companyB}, ${ids.employerB}, ${ids.industry}, 'Company B', 'Test', 1400)`;
-  await sql`insert into candidate_accounts (id, mobile) values (${ids.candidateA}, '+989130000011'), (${ids.candidateB}, '+989130000012')`;
-  await sql`insert into job_posts (id, company_id, title, status, workplace_type, employment_type, location, seniority_level, salary_negotiable, required_skills, description, published_at, expires_at) values (${ids.job}, ${ids.companyA}, 'Snapshot Job', 'published', 'hybrid', 'full_time', 'Tehran', 'mid_level', true, array['TypeScript'], '<p>Test description</p>', now() - interval '1 day', now() + interval '30 days'), (${ids.jobConcurrent}, ${ids.companyA}, 'Concurrent Job', 'published', 'remote', 'full_time', 'Remote', 'mid_level', true, array['TypeScript'], '<p>Test description</p>', now() - interval '1 day', now() + interval '30 days')`;
+  await sql`insert into candidate_accounts (id, mobile) values (${ids.candidateA}, '+989130000011'), (${ids.candidateB}, '+989130000012'), (${ids.candidateNoResume}, '+989130000013'), (${ids.candidateInvalidResume}, '+989130000014')`;
+  await sql`insert into job_posts (id, company_id, title, status, workplace_type, employment_type, location, seniority_level, salary_negotiable, required_skills, description, published_at, expires_at) values (${ids.job}, ${ids.companyA}, 'Snapshot Job', 'published', 'hybrid', 'full_time', 'Tehran', 'mid_level', true, array['TypeScript'], '<p>Test description</p>', now() - interval '1 day', now() + interval '30 days'), (${ids.jobConcurrent}, ${ids.companyA}, 'Concurrent Job', 'published', 'remote', 'full_time', 'Remote', 'mid_level', true, array['TypeScript'], '<p>Test description</p>', now() - interval '1 day', now() + interval '30 days'), (${ids.jobClosed}, ${ids.companyA}, 'Closed Job', 'closed', 'remote', 'full_time', 'Remote', 'mid_level', true, array['TypeScript'], '<p>Test description</p>', now() - interval '2 days', now() + interval '30 days'), (${ids.jobRollback}, ${ids.companyA}, 'Rollback Job', 'published', 'remote', 'full_time', 'Remote', 'mid_level', true, array['TypeScript'], '<p>Test description</p>', now() - interval '1 day', now() + interval '30 days')`;
   await saveCandidateResumeData(ids.candidateA, originalResume);
   await saveCandidateResumeData(ids.candidateB, originalResume);
+  await sql`insert into candidate_resumes (candidate_account_id, first_name, last_name, city, professional_title, professional_summary, skills) values (${ids.candidateInvalidResume}, 'Invalid', 'Resume', 'Tehran', 'Engineer', 'Invalid empty skills', array[]::text[])`;
 });
 
 after(async () => { await endDatabaseConnection(); await sql.end(); });
@@ -69,6 +74,27 @@ test("concurrent idempotent submissions create exactly one application and one s
   assert.deepEqual(results.sort(), ["already-applied", "created"]);
   const [counts] = await sql`select count(*)::int as applications, count(s.job_application_id)::int as snapshots from job_applications a left join application_resume_snapshots s on s.job_application_id = a.id where a.candidate_account_id = ${ids.candidateA} and a.job_post_id = ${ids.jobConcurrent}`;
   assert.deepEqual(counts, { applications: 1, snapshots: 1 });
+});
+
+test("missing, invalid Resumes and ineligible Jobs create no Application", async () => {
+  assert.equal(await createCandidateApplication(ids.candidateNoResume, ids.jobRollback), "resume-required");
+  assert.equal(await createCandidateApplication(ids.candidateInvalidResume, ids.jobRollback), "resume-required");
+  assert.equal(await createCandidateApplication(ids.candidateA, ids.jobClosed), "job-unavailable");
+  const [counts] = await sql`select count(*)::int as count from job_applications where job_post_id in (${ids.jobClosed}, ${ids.jobRollback})`;
+  assert.equal(counts.count, 0);
+});
+
+test("snapshot failure rolls back the Application atomically", async () => {
+  await sql`create function jobut_test_reject_snapshot() returns trigger language plpgsql as $$ begin raise exception 'test snapshot failure'; end $$`;
+  await sql`create trigger jobut_test_reject_snapshot before insert on application_resume_snapshots for each row execute function jobut_test_reject_snapshot()`;
+  try {
+    await assert.rejects(createCandidateApplication(ids.candidateA, ids.jobRollback));
+    const [counts] = await sql`select count(*)::int as count from job_applications where candidate_account_id = ${ids.candidateA} and job_post_id = ${ids.jobRollback}`;
+    assert.equal(counts.count, 0);
+  } finally {
+    await sql`drop trigger if exists jobut_test_reject_snapshot on application_resume_snapshots`;
+    await sql`drop function if exists jobut_test_reject_snapshot()`;
+  }
 });
 
 test("concurrent resume edit and submission cannot produce a mixed snapshot", async () => {

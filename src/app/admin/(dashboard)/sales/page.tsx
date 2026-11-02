@@ -8,7 +8,8 @@ import {
   type PurchaseStatusFilter,
   type SalesRange,
 } from "@/admin/sales-policy";
-import { requireAdmin } from "@/admin-auth/session";
+import { adminPageAccessPolicy } from "@/admin-auth/authorization-policy";
+import { requireAdminPermission } from "@/admin-auth/rbac-guards";
 import { SalesChart } from "@/components/admin/sales-chart";
 import { Badge, Card, Select, buttonClassNames } from "@/components/ui";
 
@@ -37,9 +38,9 @@ function salesHref(params: { range: SalesRange; status: PurchaseStatusFilter; pa
 }
 
 export default async function AdminSalesPage({ searchParams }: PageProps) {
-  await requireAdmin();
+  const principal = await requireAdminPermission(adminPageAccessPolicy.sales);
   const params = parseAdminSalesParams(await searchParams);
-  const data = await getAdminSales(params);
+  const data = await getAdminSales(principal, params);
   const rangePaidTotal = data.buckets.reduce((total, bucket) => total + bucket.amount, 0);
 
   return (

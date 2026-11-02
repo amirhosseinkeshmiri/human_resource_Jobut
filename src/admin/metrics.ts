@@ -1,6 +1,8 @@
 import "server-only";
 import { count, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
+import { adminPageAccessPolicy } from "@/admin-auth/authorization-policy";
+import { requireAdminPermission, type ActiveAdminPrincipal } from "@/admin-auth/rbac-guards";
 import {
   candidateAccounts,
   companies,
@@ -11,7 +13,8 @@ import {
 
 export const PAID_PURCHASE_STATUS = "paid" as const;
 
-export async function getAdminDashboardMetrics() {
+export async function getAdminDashboardMetrics(principal: ActiveAdminPrincipal) {
+  await requireAdminPermission(adminPageAccessPolicy.dashboard, principal);
   const [[totalJobs], [publishedJobs], [companyCount], [candidateCount], [paidPurchases], [credits]] = await Promise.all([
     db.select({ value: count() }).from(jobPosts),
     db.select({ value: count() }).from(jobPosts).where(eq(jobPosts.status, "published")),

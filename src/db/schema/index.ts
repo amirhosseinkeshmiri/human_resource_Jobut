@@ -14,6 +14,7 @@ import {
   text,
   timestamp,
   unique,
+  uniqueIndex,
   uuid,
   varchar,
 } from "drizzle-orm/pg-core";
@@ -364,6 +365,95 @@ export const candidateAccounts = pgTable(
   ],
 );
 
+export const candidateLegalAcceptances = pgTable(
+  "candidate_legal_acceptances",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    candidateAccountId: uuid("candidate_account_id")
+      .notNull()
+      .references(() => candidateAccounts.id, { onDelete: "restrict" }),
+    termsVersion: varchar("terms_version", { length: 64 }).notNull(),
+    privacyVersion: varchar("privacy_version", { length: 64 }).notNull(),
+    acceptedAt: timestamp("accepted_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    unique("candidate_legal_acceptances_versions_unique").on(
+      table.candidateAccountId,
+      table.termsVersion,
+      table.privacyVersion,
+    ),
+    index("candidate_legal_acceptances_candidate_time_idx").on(
+      table.candidateAccountId,
+      table.acceptedAt,
+    ),
+  ],
+);
+
+export const candidateDataRequestType = pgEnum("candidate_data_request_type", [
+  "personal_data_export",
+  "account_deletion",
+]);
+
+export const candidateDataRequestStatus = pgEnum("candidate_data_request_status", [
+  "pending",
+  "in_progress",
+  "completed",
+  "rejected",
+  "cancelled",
+]);
+
+export const candidateDataRequests = pgTable(
+  "candidate_data_requests",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    candidateAccountId: uuid("candidate_account_id")
+      .notNull()
+      .references(() => candidateAccounts.id, { onDelete: "restrict" }),
+    requestType: candidateDataRequestType("request_type").notNull(),
+    status: candidateDataRequestStatus("status").default("pending").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+    resolvedAt: timestamp("resolved_at", { withTimezone: true }),
+  },
+  (table) => [
+    uniqueIndex("candidate_data_requests_active_type_unique")
+      .on(table.candidateAccountId, table.requestType)
+      .where(sql`${table.status} in ('pending', 'in_progress')`),
+    index("candidate_data_requests_candidate_created_idx").on(
+      table.candidateAccountId,
+      table.createdAt,
+    ),
+    check(
+      "candidate_data_requests_resolution_check",
+      sql`(${table.status} in ('pending', 'in_progress') and ${table.resolvedAt} is null) or (${table.status} in ('completed', 'rejected', 'cancelled') and ${table.resolvedAt} is not null)`,
+    ),
+  ],
+);
+
+export const candidateDataRequestStatusEvents = pgTable(
+  "candidate_data_request_status_events",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    requestId: uuid("request_id")
+      .notNull()
+      .references(() => candidateDataRequests.id, { onDelete: "restrict" }),
+    fromStatus: candidateDataRequestStatus("from_status"),
+    toStatus: candidateDataRequestStatus("to_status").notNull(),
+    source: varchar("source", { length: 32 }).default("candidate").notNull(),
+    occurredAt: timestamp("occurred_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("candidate_data_request_events_request_time_idx").on(
+      table.requestId,
+      table.occurredAt,
+    ),
+    check(
+      "candidate_data_request_events_source_check",
+      sql`${table.source} in ('candidate', 'operator', 'system')`,
+    ),
+  ],
+);
+
 export const candidateJobPreferences = pgTable(
   "candidate_job_preferences",
   {
@@ -658,6 +748,33 @@ export const jobApplicationStatusHistory = pgTable(
     index("job_application_status_history_application_changed_idx").on(
       table.jobApplicationId,
       table.changedAt,
+    ),
+  ],
+);
+
+export const candidateApplicationStatusNotifications = pgTable(
+  "candidate_application_status_notifications",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    candidateAccountId: uuid("candidate_account_id")
+      .notNull()
+      .references(() => candidateAccounts.id, { onDelete: "restrict" }),
+    statusHistoryId: uuid("status_history_id")
+      .notNull()
+      .references(() => jobApplicationStatusHistory.id, { onDelete: "restrict" }),
+    occurredAt: timestamp("occurred_at", { withTimezone: true }).notNull(),
+    readAt: timestamp("read_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    unique("candidate_application_notifications_history_unique").on(table.statusHistoryId),
+    index("candidate_application_notifications_candidate_time_idx").on(
+      table.candidateAccountId,
+      table.occurredAt,
+    ),
+    index("candidate_application_notifications_candidate_read_idx").on(
+      table.candidateAccountId,
+      table.readAt,
     ),
   ],
 );

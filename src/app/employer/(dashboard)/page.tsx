@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { DashboardStatCard } from "@/components/dashboard/dashboard-stat-card";
+import { FormDraftCleanup } from "@/components/forms/form-draft-cleanup";
 import { getEmployerDashboardContext } from "@/dashboard/context";
 import { getEmployerDashboardMetrics } from "@/dashboard/metrics";
 
@@ -7,12 +8,20 @@ export const metadata: Metadata = {
   title: "خانه کارفرما",
 };
 
-export default async function EmployerHomePage() {
-  const { company } = await getEmployerDashboardContext();
+interface EmployerHomePageProps {
+  searchParams: Promise<{ companySaved?: string | string[] }>;
+}
+
+export default async function EmployerHomePage({ searchParams }: EmployerHomePageProps) {
+  const [{ companySaved }, { company, employer }] = await Promise.all([searchParams, getEmployerDashboardContext()]);
   const metrics = await getEmployerDashboardMetrics(company.id);
 
   return (
     <div>
+      {companySaved === "1" ? <FormDraftCleanup scopes={[
+        { accountId: employer.id, formId: "company-profile", entityId: "new" },
+        { accountId: employer.id, formId: "company-profile", entityId: company.id },
+      ]} /> : null}
       <div>
         <p className="text-meta">خانه</p>
         <h1 className="text-page-title mt-2">نمای کلی</h1>

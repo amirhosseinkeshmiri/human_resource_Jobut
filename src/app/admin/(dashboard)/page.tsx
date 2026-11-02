@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { getAdminDashboardMetrics } from "@/admin/metrics";
+import { adminPageAccessPolicy, hasAdminPermission } from "@/admin-auth/authorization-policy";
+import { requireAdminPermission } from "@/admin-auth/rbac-guards";
 import { DashboardStatCard } from "@/components/dashboard/dashboard-stat-card";
 import { Card } from "@/components/ui";
 
@@ -9,14 +11,18 @@ export const metadata: Metadata = { title: "داشبورد مدیریت" };
 const numberFormatter = new Intl.NumberFormat("fa-IR");
 
 export default async function AdminDashboardPage() {
-  const metrics = await getAdminDashboardMetrics();
+  const principal = await requireAdminPermission(adminPageAccessPolicy.dashboard);
+  const metrics = await getAdminDashboardMetrics(principal);
+  const jobsHref = hasAdminPermission(principal, adminPageAccessPolicy.jobs) ? "/admin/jobs" : undefined;
+  const employersHref = hasAdminPermission(principal, adminPageAccessPolicy.employers) ? "/admin/employers" : undefined;
+  const salesHref = hasAdminPermission(principal, adminPageAccessPolicy.sales) ? "/admin/sales" : undefined;
   const cards = [
-    { label: "کل آگهی‌ها", value: numberFormatter.format(metrics.totalJobPosts), description: "تمام وضعیت‌های آگهی", href: "/admin/jobs" },
-    { label: "آگهی‌های منتشرشده", value: numberFormatter.format(metrics.publishedJobPosts), description: "وضعیت منتشرشده در پایگاه داده", href: "/admin/jobs?status=published_active" },
-    { label: "کارفرماها", value: numberFormatter.format(metrics.companies), description: "شرکت‌های ثبت‌شده", href: "/admin/employers" },
+    { label: "کل آگهی‌ها", value: numberFormatter.format(metrics.totalJobPosts), description: "تمام وضعیت‌های آگهی", href: jobsHref },
+    { label: "آگهی‌های منتشرشده", value: numberFormatter.format(metrics.publishedJobPosts), description: "وضعیت منتشرشده در پایگاه داده", href: jobsHref ? `${jobsHref}?status=published_active` : undefined },
+    { label: "کارفرماها", value: numberFormatter.format(metrics.companies), description: "شرکت‌های ثبت‌شده", href: employersHref },
     { label: "حساب‌های کارجو", value: numberFormatter.format(metrics.candidateAccounts), description: "هویت‌های احراز‌شده کارجو" },
-    { label: "مبلغ خریدهای پرداخت‌شده", value: `${numberFormatter.format(metrics.paidPurchaseAmountToman)} تومان`, description: "جمع مبلغ بسته‌های دارای وضعیت پرداخت‌شده", href: "/admin/sales" },
-    { label: "اعتبار فعلی کارفرماها", value: numberFormatter.format(metrics.totalEmployerCredits), description: "جمع مانده دفترکل اعتبار همه شرکت‌ها", href: "/admin/sales" },
+    { label: "مبلغ خریدهای پرداخت‌شده", value: `${numberFormatter.format(metrics.paidPurchaseAmountToman)} تومان`, description: "جمع مبلغ بسته‌های دارای وضعیت پرداخت‌شده", href: salesHref },
+    { label: "اعتبار فعلی کارفرماها", value: numberFormatter.format(metrics.totalEmployerCredits), description: "جمع مانده دفترکل اعتبار همه شرکت‌ها", href: salesHref },
   ];
 
   return (

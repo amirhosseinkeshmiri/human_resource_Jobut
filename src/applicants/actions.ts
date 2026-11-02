@@ -4,7 +4,11 @@ import { revalidatePath } from "next/cache";
 import { notFound, redirect } from "next/navigation";
 import { z } from "zod";
 import { APPLICATION_STATUSES } from "@/applications/status-policy";
+import { inspectTrustedAuthActionRequest } from "@/auth/request-security";
+import { isBoundedAuthFormData } from "@/auth/form-security";
 import { getEmployerDashboardContext } from "@/dashboard/context";
+import { deliverApplicationStatusNotifications } from "@/notifications/service";
+import { shouldDeliverApplicationStatusNotification } from "@/notifications/application-status-policy";
 import { transitionEmployerApplicationStatus, updateEmployerApplicationNote } from "./mutations";
 import { validateEmployerNote } from "./note-policy";
 
@@ -16,6 +20,8 @@ const transitionSchema = z.object({
 
 export async function transitionApplicationStatus(formData: FormData): Promise<void> {
   const { company } = await getEmployerDashboardContext();
+  const requestInspection = await inspectTrustedAuthActionRequest();
+  if (!requestInspection.trusted || !isBoundedAuthFormData(formData, ["jobId", "applicationId", "targetStatus"])) notFound();
   const parsed = transitionSchema.safeParse({
     jobId: formData.get("jobId"),
     applicationId: formData.get("applicationId"),
@@ -39,9 +45,14 @@ export async function transitionApplicationStatus(formData: FormData): Promise<v
     redirect(`${detailPath}?transition=${result === "stale" ? "stale" : "invalid"}`);
   }
 
+  if (shouldDeliverApplicationStatusNotification(result)) {
+    await deliverApplicationStatusNotifications(parsed.data.applicationId);
+  }
+
   revalidatePath(`/employer/jobs/${parsed.data.jobId}/applications`);
   revalidatePath(detailPath);
   revalidatePath("/candidate/applications");
+  revalidatePath("/candidate/notifications");
 }
 
 const employerNoteIdsSchema = z.object({

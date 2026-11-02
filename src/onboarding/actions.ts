@@ -145,5 +145,5 @@ export async function saveCompanyOnboarding(
     return { status: "error", message: "ثبت اطلاعات شرکت انجام نشد. دوباره تلاش کنید." };
   }
 
-  redirect("/employer");
+  redirect("/employer?companySaved=1");
 }

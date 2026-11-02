@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import type { AdminDatabaseAuthorizationContext } from "./rbac-service";
 import { createAdminRbacRequestGuards } from "./rbac-guard-core";
+import { adminPageAccessPolicy } from "./authorization-policy";
 
 class GuardSignal extends Error {
   constructor(readonly kind: "login" | "denied") {
@@ -157,4 +158,41 @@ test("one resolved principal can be safely reused without duplicate request look
   await guards.requireAdminPermission("admin.jobs.read", principal);
   await guards.requireOwnerOnlyOperation("admin.accounts.status.manage", principal);
   assert.deepEqual(reads(), { sessionReads: 1, authorizationReads: 1 });
+});
+
+test("each existing Admin area denies direct URL access without its exact permission", async () => {
+  for (const permission of Object.values(adminPageAccessPolicy)) {
+    const permittedContext = context({ permissions: new Set([permission]) });
+    const permitted = createHarness({
+      authorizationContext: permittedContext,
+    });
+    assert.equal(await permitted.guards.requireAdminPermission(permission), permittedContext);
+
+    const unpermitted = createHarness({
+      authorizationContext: context({ permissions: new Set() }),
+    });
+    await expectSignal(
+      () => unpermitted.guards.requireAdminPermission(permission),
+      "denied",
+    );
+  }
+});
+
+test("platform owner can access every existing Admin area without assignable permissions", async () => {
+  const ownerContext = context({ isOwner: true, permissions: new Set() });
+  const owner = createHarness({ authorizationContext: ownerContext });
+  const principal = await owner.guards.requireActiveAdmin();
+
+  for (const permission of Object.values(adminPageAccessPolicy)) {
+    assert.equal(await owner.guards.requireAdminPermission(permission, principal), principal);
+  }
+});
+
+test("Admin management remains owner-only even when an ordinary Admin has every page permission", async () => {
+  const ordinary = createHarness({
+    authorizationContext: context({
+      permissions: new Set(Object.values(adminPageAccessPolicy)),
+    }),
+  });
+  await expectSignal(() => ordinary.guards.requireSuperAdmin(), "denied");
 });

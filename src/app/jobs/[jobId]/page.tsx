@@ -6,9 +6,10 @@ import { getApplicationEligibility } from "@/applications/policy";
 import { getCandidateApplyState } from "@/applications/queries";
 import { getCurrentCandidate } from "@/candidate-auth/session";
 import { CompanyLogo } from "@/components/jobs/company-logo";
+import { ApplicationSubmitForm } from "@/components/jobs/application-submit-form";
 import { PublicFooter } from "@/components/landing/public-footer";
 import { PublicHeader } from "@/components/landing/public-header";
-import { Badge, Button, Card, Container, buttonClassNames } from "@/components/ui";
+import { Badge, Card, Container, buttonClassNames } from "@/components/ui";
 import { sanitizeJobDescription } from "@/jobs/description";
 import { formatJobSalary } from "@/jobs/public-policy";
 import { getPublicJobById } from "@/jobs/public-queries";
@@ -18,6 +19,7 @@ export const dynamic = "force-dynamic";
 
 interface PublicJobPageProps {
   params: Promise<{ jobId: string }>;
+  searchParams: Promise<{ application?: string | string[] }>;
 }
 
 export async function generateMetadata({ params }: PublicJobPageProps): Promise<Metadata> {
@@ -33,10 +35,11 @@ export async function generateMetadata({ params }: PublicJobPageProps): Promise<
 
 const dateFormatter = new Intl.DateTimeFormat("fa-IR", { dateStyle: "long" });
 
-export default async function PublicJobPage({ params }: PublicJobPageProps) {
-  const { jobId } = await params;
+export default async function PublicJobPage({ params, searchParams }: PublicJobPageProps) {
+  const [{ jobId }, query] = await Promise.all([params, searchParams]);
   const [job, candidate] = await Promise.all([getPublicJobById(jobId), getCurrentCandidate()]);
   if (!job) notFound();
+  const applicationOutcome = Array.isArray(query.application) ? query.application[0] : query.application;
   const candidateState = candidate ? await getCandidateApplyState(candidate.id, job.id) : null;
   const applicationEligibility = getApplicationEligibility({
     authenticated: Boolean(candidate),
@@ -101,10 +104,11 @@ export default async function PublicJobPage({ params }: PublicJobPageProps) {
 
               <Card className="shadow-none">
                 <h2 className="text-card-title">ارسال درخواست</h2>
+                {applicationOutcome === "error" ? <p role="alert" className="mt-3 rounded-md border border-danger/30 bg-danger/5 p-3 text-sm text-danger">ارسال درخواست انجام نشد. اطلاعاتی ثبت نشده است؛ لطفاً دوباره تلاش کنید.</p> : null}
                 {applicationEligibility === "login-required" ? <><p className="text-secondary mt-2">برای ارسال رزومه وارد حساب کارجو شوید.</p><Link href="/login/candidate" className={buttonClassNames({ className: "mt-4 w-full" })}>ورود به حساب کارجو</Link></> : null}
                 {applicationEligibility === "resume-required" ? <><p className="text-secondary mt-2">برای ارسال درخواست ابتدا رزومه خود را تکمیل کنید.</p><Link href="/candidate/resume" className={buttonClassNames({ className: "mt-4 w-full" })}>تکمیل رزومه</Link></> : null}
                 {applicationEligibility === "already-applied" ? <><p className="mt-2 font-semibold text-success">درخواست شما ارسال شده است.</p><Link href="/candidate/applications" className={buttonClassNames({ variant: "secondary", className: "mt-4 w-full" })}>مشاهده درخواست‌های من</Link></> : null}
-                {applicationEligibility === "eligible" ? <><p className="text-secondary mt-2">رزومه فعلی شما در شبکه استخدامی متخصصین آکادمیک برای این فرصت ارسال می‌شود.</p><form action={applyToJob} className="mt-4"><input type="hidden" name="jobPostId" value={job.id} /><Button type="submit" className="w-full">ارسال رزومه</Button></form></> : null}
+                {applicationEligibility === "eligible" ? <><p className="text-secondary mt-2">رزومه فعلی شما در شبکه استخدامی متخصصین آکادمیک برای این فرصت ارسال می‌شود.</p><ApplicationSubmitForm action={applyToJob} jobPostId={job.id} /></> : null}
                 {applicationEligibility === "job-unavailable" ? <p className="text-secondary mt-2">این آگهی دیگر فعال نیست.</p> : null}
               </Card>
 

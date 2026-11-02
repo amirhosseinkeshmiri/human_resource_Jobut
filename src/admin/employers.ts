@@ -1,6 +1,8 @@
 import "server-only";
 import { asc, count, desc, eq, ilike, or, sql } from "drizzle-orm";
 import { db } from "@/db";
+import { adminPageAccessPolicy } from "@/admin-auth/authorization-policy";
+import { requireAdminPermission, type ActiveAdminPrincipal } from "@/admin-auth/rbac-guards";
 import {
   companies,
   companyJobCreditTransactions,
@@ -16,7 +18,8 @@ import {
   type EmployerListParams,
 } from "./employers-policy";
 
-export async function getAdminEmployers(params: EmployerListParams) {
+export async function getAdminEmployers(principal: ActiveAdminPrincipal, params: EmployerListParams) {
+  await requireAdminPermission(adminPageAccessPolicy.employers, principal);
   const jobStats = db
     .select({
       companyId: jobPosts.companyId,
@@ -93,7 +96,8 @@ export async function getAdminEmployers(params: EmployerListParams) {
   return { items, page, pageCount, total: totalRow.value };
 }
 
-export async function getAdminEmployerDetail(companyId: string) {
+export async function getAdminEmployerDetail(principal: ActiveAdminPrincipal, companyId: string) {
+  await requireAdminPermission(adminPageAccessPolicy.employers, principal);
   if (!isCompanyId(companyId)) return null;
 
   const [company] = await db

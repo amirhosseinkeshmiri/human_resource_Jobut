@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { getAdminEmployers } from "@/admin/employers";
 import { parseEmployerListParams, type EmployerSort } from "@/admin/employers-policy";
-import { requireAdmin } from "@/admin-auth/session";
+import { adminPageAccessPolicy } from "@/admin-auth/authorization-policy";
+import { requireAdminPermission } from "@/admin-auth/rbac-guards";
 import { CompanyLogo } from "@/components/jobs/company-logo";
 import { Card, Input, Label, Select, buttonClassNames } from "@/components/ui";
 
@@ -33,9 +34,9 @@ function pageHref(page: number, query: string, sort: EmployerSort) {
 }
 
 export default async function AdminEmployersPage({ searchParams }: PageProps) {
-  await requireAdmin();
+  const principal = await requireAdminPermission(adminPageAccessPolicy.employers);
   const params = parseEmployerListParams(await searchParams);
-  const result = await getAdminEmployers(params);
+  const result = await getAdminEmployers(principal, params);
 
   return (
     <div>

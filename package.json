@@ -24,6 +24,9 @@
     "test:integration": "node scripts/run-tests.mjs integration",
     "test:integration:verify-db": "node scripts/verify-integration-database.mjs",
     "test:integration:full": "node scripts/run-db-integration.mjs",
+    "test:e2e": "playwright test",
+    "test:e2e:verify-db": "node scripts/verify-e2e-database.mjs",
+    "test:e2e:full": "node scripts/run-e2e.mjs",
     "check": "npm run typecheck && npm run lint && npm run test:unit && npm run build",
     "db:generate": "drizzle-kit generate",
     "db:check": "drizzle-kit check",
@@ -47,6 +50,7 @@
     "zod": "4.6.7"
   },
   "devDependencies": {
+    "@playwright/test": "1.56.1",
     "@types/node": "26.6.4",
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",

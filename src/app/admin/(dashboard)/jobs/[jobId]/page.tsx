@@ -3,7 +3,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getAdminJobDetail } from "@/admin/jobs";
 import { adminJobPresentationLabels, getAdminJobPresentationStatus, type AdminJobPresentationStatus } from "@/admin/jobs-policy";
-import { requireAdmin } from "@/admin-auth/session";
+import { adminPageAccessPolicy } from "@/admin-auth/authorization-policy";
+import { requireAdminPermission } from "@/admin-auth/rbac-guards";
 import { Badge, Card, buttonClassNames, type BadgeProps } from "@/components/ui";
 import { sanitizeJobDescription } from "@/jobs/description";
 import { formatJobSalary } from "@/jobs/public-policy";
@@ -17,9 +18,9 @@ const dateFormatter = new Intl.DateTimeFormat("fa-IR", { dateStyle: "long" });
 const badgeVariants: Record<AdminJobPresentationStatus, BadgeProps["variant"]> = { draft: "neutral", published_active: "success", published_expired: "warning", published_incomplete: "neutral", closed: "danger" };
 
 export default async function AdminJobDetailPage({ params }: PageProps) {
-  await requireAdmin();
+  const principal = await requireAdminPermission(adminPageAccessPolicy.jobs);
   const { jobId } = await params;
-  const job = await getAdminJobDetail(jobId);
+  const job = await getAdminJobDetail(principal, jobId);
   if (!job) notFound();
   const displayStatus = getAdminJobPresentationStatus(job);
 

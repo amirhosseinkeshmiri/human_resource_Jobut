@@ -1,9 +1,10 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useState, useTransition, type KeyboardEvent } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition, type KeyboardEvent } from "react";
 import { useFieldArray, useForm, useWatch } from "react-hook-form";
 import { Button, Card, FormField, Input, Select, Textarea } from "@/components/ui";
+import { clearFormDraft, loadFormDraft, saveFormDraft, type FormDraftOptions } from "@/forms/form-draft";
 import {
   candidateResumeSchema,
   languageProficiencies,
@@ -17,15 +18,49 @@ interface ResumeBuilderFormProps {
   action: (formData: FormData) => Promise<void>;
   initialValues?: CandidateResumeInput;
   serverError?: string;
+  candidateAccountId: string;
+  resumeEntityId: string;
+  serverUpdatedAt: number;
 }
 
 const emptyExperience = { jobTitle: "", companyName: "", startDate: "", endDate: "", isCurrent: false, description: "" };
 const emptyEducation = { fieldOfStudy: "", institutionName: "", degree: "", startDate: "", endDate: "", isCurrent: false };
 const emptyLanguage = { name: "", proficiency: "intermediate" as const };
+const RESUME_DRAFT_FIELDS = [
+  "firstName",
+  "lastName",
+  "city",
+  "professionalTitle",
+  "professionalSummary",
+  "skills",
+  "linkedinUrl",
+  "portfolioUrl",
+  "experiences",
+  "educations",
+  "languages",
+] as const;
 
-export function ResumeBuilderForm({ action, initialValues, serverError }: ResumeBuilderFormProps) {
+export function ResumeBuilderForm({
+  action,
+  initialValues,
+  serverError,
+  candidateAccountId,
+  resumeEntityId,
+  serverUpdatedAt,
+}: ResumeBuilderFormProps) {
   const [skillInput, setSkillInput] = useState("");
   const [isPending, startTransition] = useTransition();
+  const pendingSaveRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const userEditedRef = useRef(false);
+  const skipNextSaveRef = useRef(false);
+  const initialFormValues = useMemo<CandidateResumeInput>(() => initialValues ?? {
+    firstName: "", lastName: "", city: "", professionalTitle: "", professionalSummary: "",
+    skills: [], linkedinUrl: "", portfolioUrl: "", experiences: [], educations: [], languages: [],
+  }, [initialValues]);
+  const draftOptions = useMemo<FormDraftOptions>(() => ({
+    scope: { accountId: candidateAccountId, formId: "candidate-resume", entityId: resumeEntityId },
+    allowedFields: RESUME_DRAFT_FIELDS,
+  }), [candidateAccountId, resumeEntityId]);
   const {
     register,
     control,
@@ -33,13 +68,12 @@ export function ResumeBuilderForm({ action, initialValues, serverError }: Resume
     setValue,
     setError,
     clearErrors,
+    reset,
+    subscribe,
     formState: { errors },
   } = useForm<CandidateResumeInput, unknown, CandidateResumeValues>({
     resolver: zodResolver(candidateResumeSchema),
-    defaultValues: initialValues ?? {
-      firstName: "", lastName: "", city: "", professionalTitle: "", professionalSummary: "",
-      skills: [], linkedinUrl: "", portfolioUrl: "", experiences: [], educations: [], languages: [],
-    },
+    defaultValues: initialFormValues,
   });
   const experiences = useFieldArray({ control, name: "experiences" });
   const educations = useFieldArray({ control, name: "educations" });
@@ -47,6 +81,46 @@ export function ResumeBuilderForm({ action, initialValues, serverError }: Resume
   const skills = useWatch({ control, name: "skills" }) ?? [];
   const experienceValues = useWatch({ control, name: "experiences" }) ?? [];
   const educationValues = useWatch({ control, name: "educations" }) ?? [];
+
+  useEffect(() => {
+    if (userEditedRef.current) return;
+    const draft = loadFormDraft<CandidateResumeInput>(window.sessionStorage, draftOptions, serverUpdatedAt);
+    if (draft && !userEditedRef.current) reset({ ...initialFormValues, ...draft.values });
+  }, [draftOptions, initialFormValues, reset, serverUpdatedAt]);
+
+  useEffect(() => {
+    const unsubscribe = subscribe({
+      formState: { values: true },
+      callback: ({ values }) => {
+        if (skipNextSaveRef.current) {
+          skipNextSaveRef.current = false;
+          return;
+        }
+        userEditedRef.current = true;
+        if (pendingSaveRef.current) clearTimeout(pendingSaveRef.current);
+        pendingSaveRef.current = setTimeout(() => {
+          saveFormDraft(window.sessionStorage, draftOptions, values as Record<string, unknown>);
+          pendingSaveRef.current = undefined;
+        }, 350);
+      },
+    });
+    return () => {
+      if (pendingSaveRef.current) clearTimeout(pendingSaveRef.current);
+      unsubscribe();
+    };
+  }, [draftOptions, subscribe]);
+
+  function discardDraft() {
+    if (pendingSaveRef.current) {
+      clearTimeout(pendingSaveRef.current);
+      pendingSaveRef.current = undefined;
+    }
+    clearFormDraft(window.sessionStorage, draftOptions.scope);
+    skipNextSaveRef.current = true;
+    reset(initialFormValues);
+    queueMicrotask(() => { skipNextSaveRef.current = false; });
+    setSkillInput("");
+  }
 
   function addSkill() {
     const skill = skillInput.trim().replace(/\s+/g, " ");
@@ -74,6 +148,7 @@ export function ResumeBuilderForm({ action, initialValues, serverError }: Resume
   return (
     <form onSubmit={handleSubmit(submit)} className="grid gap-6" noValidate>
       {serverError ? <p role="alert" className="rounded-md border border-danger/30 bg-danger/5 p-3 text-sm text-danger">{serverError}</p> : null}
+      <p className="rounded-md border border-ui-border bg-surface-elevated p-3 text-sm text-text-secondary">پیش‌نویس موقت این فرم فقط در همین زبانه مرورگر نگهداری می‌شود و با بستن زبانه قابل بازیابی نیست. فایل، اطلاعات ورود یا اطلاعات پرداخت در آن ذخیره نمی‌شود.</p>
 
       <Card className="shadow-none"><h2 className="text-section-title">اطلاعات پایه</h2><div className="mt-5 grid gap-5 sm:grid-cols-2">
         <FormField id="resume-first-name" label="نام" required error={errors.firstName?.message}><Input {...register("firstName")} maxLength={100} autoComplete="given-name" /></FormField>
@@ -94,7 +169,7 @@ export function ResumeBuilderForm({ action, initialValues, serverError }: Resume
 
       <Card className="shadow-none"><h2 className="text-section-title">لینک‌های حرفه‌ای</h2><div className="mt-5 grid gap-5 sm:grid-cols-2"><FormField id="resume-linkedin" label="لینکدین" error={errors.linkedinUrl?.message}><Input type="url" dir="ltr" placeholder="https://linkedin.com/in/..." {...register("linkedinUrl")} /></FormField><FormField id="resume-portfolio" label="نمونه‌کار" error={errors.portfolioUrl?.message}><Input type="url" dir="ltr" placeholder="https://example.com" {...register("portfolioUrl")} /></FormField></div></Card>
 
-      <div className="sticky bottom-3 z-10 rounded-lg border border-ui-border bg-surface/95 p-3 shadow-lg backdrop-blur sm:flex sm:justify-end"><Button type="submit" loading={isPending} className="w-full sm:w-auto">ذخیره رزومه</Button></div>
+      <div className="sticky bottom-3 z-10 flex flex-col-reverse gap-3 rounded-lg border border-ui-border bg-surface/95 p-3 shadow-lg backdrop-blur sm:flex-row sm:justify-end"><Button type="button" variant="ghost" onClick={discardDraft} disabled={isPending}>حذف پیش‌نویس موقت</Button><Button type="submit" loading={isPending} className="w-full sm:w-auto">ذخیره رزومه</Button></div>
     </form>
   );
 }

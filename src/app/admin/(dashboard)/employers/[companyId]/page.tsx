@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getAdminEmployerDetail } from "@/admin/employers";
-import { requireAdmin } from "@/admin-auth/session";
+import { adminPageAccessPolicy } from "@/admin-auth/authorization-policy";
+import { requireAdminPermission } from "@/admin-auth/rbac-guards";
 import { CompanyLogo } from "@/components/jobs/company-logo";
 import { Badge, Card, buttonClassNames } from "@/components/ui";
 import { jobStatusLabels, type JobStatus } from "@/jobs/policy";
@@ -16,9 +17,9 @@ const dateFormatter = new Intl.DateTimeFormat("fa-IR", { dateStyle: "medium" });
 const purchaseStatus = { paid: "پرداخت‌شده", pending: "در انتظار پرداخت" } as const;
 
 export default async function AdminEmployerDetailPage({ params }: PageProps) {
-  await requireAdmin();
+  const principal = await requireAdminPermission(adminPageAccessPolicy.employers);
   const { companyId } = await params;
-  const detail = await getAdminEmployerDetail(companyId);
+  const detail = await getAdminEmployerDetail(principal, companyId);
   if (!detail) notFound();
 
   const { company, jobs, purchases, credits, recentJobs, recentPurchases, recentCredits } = detail;

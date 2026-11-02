@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { requireCandidate } from "@/candidate-auth/session";
 import { CandidateShell } from "@/components/candidate/candidate-shell";
+import { FormDraftCleanup } from "@/components/forms/form-draft-cleanup";
 import { ResumeBuilderForm } from "@/components/resume/resume-builder-form";
 import { ResumePreview } from "@/components/resume/resume-preview";
 import { saveCandidateResume } from "@/resume/actions";
@@ -31,5 +32,8 @@ export default async function CandidateResumePage({ searchParams }: PageProps) {
     languages: resume.languages.map((item) => ({ name: item.name, proficiency: item.proficiency })),
   } : undefined;
 
-  return <CandidateShell current="resume"><div className="mx-auto max-w-4xl">{saved ? <p role="status" className="mb-5 rounded-md border border-success/30 bg-success/5 p-3 text-sm font-semibold text-success">رزومه با موفقیت ذخیره شد.</p> : null}{resume && mode !== "edit" ? <ResumePreview resume={resume} /> : <><div className="mb-7"><p className="text-meta">رزومه ساختاریافته شبکه استخدامی متخصصین آکادمیک</p><h1 className="text-page-title mt-2">{resume ? "ویرایش رزومه" : "ساخت رزومه"}</h1><p className="text-secondary mt-3">اطلاعات حرفه‌ای خود را در بخش‌های کوتاه و مشخص تکمیل کنید.</p></div><ResumeBuilderForm action={saveCandidateResume} initialValues={initialValues} serverError={invalid ? "اطلاعات ارسالی معتبر نبود. لطفاً فیلدها را بررسی کنید." : undefined} /></>}</div></CandidateShell>;
+  return <CandidateShell current="resume"><div className="mx-auto max-w-4xl">{saved && resume ? <FormDraftCleanup storage="session" scopes={[
+    { accountId: candidate.id, formId: "candidate-resume", entityId: "new" },
+    { accountId: candidate.id, formId: "candidate-resume", entityId: resume.id },
+  ]} /> : null}{saved ? <p role="status" className="mb-5 rounded-md border border-success/30 bg-success/5 p-3 text-sm font-semibold text-success">رزومه با موفقیت ذخیره شد.</p> : null}{resume && mode !== "edit" ? <ResumePreview resume={resume} /> : <><div className="mb-7"><p className="text-meta">رزومه ساختاریافته شبکه استخدامی متخصصین آکادمیک</p><h1 className="text-page-title mt-2">{resume ? "ویرایش رزومه" : "ساخت رزومه"}</h1><p className="text-secondary mt-3">اطلاعات حرفه‌ای خود را در بخش‌های کوتاه و مشخص تکمیل کنید.</p></div><ResumeBuilderForm action={saveCandidateResume} initialValues={initialValues} candidateAccountId={candidate.id} resumeEntityId={resume?.id ?? "new"} serverUpdatedAt={resume?.updatedAt.getTime() ?? 0} serverError={invalid ? "اطلاعات ارسالی معتبر نبود. لطفاً فیلدها را بررسی کنید." : undefined} /></>}</div></CandidateShell>;
 }

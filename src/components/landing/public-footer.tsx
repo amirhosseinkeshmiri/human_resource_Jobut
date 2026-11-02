@@ -9,6 +9,8 @@ const quickLinks = [
   ["درباره ما", "/#about"],
   [PUBLIC_JOBS_LABEL, PUBLIC_JOBS_ROUTE],
   ["ارتباط با ما", "/#contact"],
+  ["شرایط استفاده", "/terms"],
+  ["حریم خصوصی", "/privacy"],
 ];
 
 const messagingLabels = ["ایتا", "بله", "واتساپ", "تلگرام", "اینستاگرام", "لینکدین"];

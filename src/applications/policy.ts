@@ -62,6 +62,14 @@ export function buildApplicationInsert(candidateAccountId: string, candidateResu
   return { candidateAccountId, candidateResumeId, jobPostId, status: DEFAULT_APPLICATION_STATUS };
 }
 
+export function canSubmitApplicationRequest(input: {
+  originTrusted: boolean;
+  formBounded: boolean;
+  jobIdValid: boolean;
+}) {
+  return input.originTrusted && input.formBounded && input.jobIdValid;
+}
+
 export function shouldKeepApplicationInHistory() {
   return true;
 }

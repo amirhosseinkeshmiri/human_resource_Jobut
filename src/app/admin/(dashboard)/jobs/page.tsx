@@ -9,7 +9,8 @@ import {
   type AdminJobPresentationStatus,
   type AdminJobSort,
 } from "@/admin/jobs-policy";
-import { requireAdmin } from "@/admin-auth/session";
+import { adminPageAccessPolicy } from "@/admin-auth/authorization-policy";
+import { requireAdminPermission } from "@/admin-auth/rbac-guards";
 import { Badge, Card, Input, Label, Select, buttonClassNames, type BadgeProps } from "@/components/ui";
 import { employmentTypeLabels, workplaceTypeLabels } from "@/jobs/validation";
 
@@ -51,9 +52,9 @@ function jobsHref(page: number, params: ReturnType<typeof parseAdminJobParams>) 
 }
 
 export default async function AdminJobsPage({ searchParams }: PageProps) {
-  await requireAdmin();
+  const principal = await requireAdminPermission(adminPageAccessPolicy.jobs);
   const params = parseAdminJobParams(await searchParams);
-  const data = await getAdminJobs(params);
+  const data = await getAdminJobs(principal, params);
 
   return (
     <div>

@@ -17,9 +17,12 @@ export async function getCandidateJobPreferences(candidateAccountId: string) {
     preferredWorkplaceTypes: candidateJobPreferences.preferredWorkplaceTypes,
     preferredEmploymentTypes: candidateJobPreferences.preferredEmploymentTypes,
     preferredSeniorityLevels: candidateJobPreferences.preferredSeniorityLevels,
+    updatedAt: candidateJobPreferences.updatedAt,
   }).from(candidateJobPreferences)
     .where(eq(candidateJobPreferences.candidateAccountId, candidateAccountId))
     .limit(1);
 
-  return preferences ?? emptyCandidateJobPreferences;
+  if (!preferences) return { values: emptyCandidateJobPreferences, updatedAt: null };
+  const { updatedAt, ...values } = preferences;
+  return { values, updatedAt };
 }

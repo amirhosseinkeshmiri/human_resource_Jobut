@@ -134,6 +134,27 @@
       "when": 1793520116531,
       "tag": "0018_giant_tana_nile",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1793603062834,
+      "tag": "0019_bizarre_power_man",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1793605038711,
+      "tag": "0020_wise_phalanx",
+      "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1793606810236,
+      "tag": "0021_curved_the_professor",
+      "breakpoints": true
     }
   ]
 }

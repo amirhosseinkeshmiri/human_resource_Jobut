@@ -22,6 +22,8 @@ export default async function EmployerOnboardingPage() {
   const existing = onboarding.company
     ? {
         name: onboarding.company.name,
+        id: onboarding.company.id,
+        updatedAt: onboarding.company.updatedAt,
         industryId: onboarding.company.industryId,
         address: onboarding.company.address,
         foundingYear: onboarding.company.foundingYear,
@@ -48,6 +50,7 @@ export default async function EmployerOnboardingPage() {
               benefits={referenceData.benefits}
               existing={existing}
               maximumFoundingYear={currentIranianYear()}
+              employerAccountId={employer.id}
             />
           </Card>
         </div>

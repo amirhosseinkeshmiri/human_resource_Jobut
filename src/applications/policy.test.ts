@@ -8,6 +8,7 @@ import {
   JOB_APPLICATION_FIELDS,
   applicationUniquenessKey,
   buildApplicationInsert,
+  canSubmitApplicationRequest,
   getApplicationEligibility,
   isApplicationOwnedByCandidate,
   shouldKeepApplicationInHistory,
@@ -56,6 +57,13 @@ test("browser supplies only Job ID while Candidate and Resume are server-derived
   assert.deepEqual(buildApplicationInsert("candidate-a", "resume-a", "job-a"), {
     candidateAccountId: "candidate-a", candidateResumeId: "resume-a", jobPostId: "job-a", status: "received",
   });
+});
+
+test("submission boundary requires trusted origin, bounded form, and valid Job ID", () => {
+  assert.equal(canSubmitApplicationRequest({ originTrusted: true, formBounded: true, jobIdValid: true }), true);
+  assert.equal(canSubmitApplicationRequest({ originTrusted: false, formBounded: true, jobIdValid: true }), false);
+  assert.equal(canSubmitApplicationRequest({ originTrusted: true, formBounded: false, jobIdValid: true }), false);
+  assert.equal(canSubmitApplicationRequest({ originTrusted: true, formBounded: true, jobIdValid: false }), false);
 });
 
 test("anonymous visitors cannot create Applications", () => {

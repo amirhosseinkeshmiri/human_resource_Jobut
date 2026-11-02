@@ -1,6 +1,8 @@
 import "server-only";
 import { and, asc, count, desc, eq, gte, isNotNull, sql } from "drizzle-orm";
 import { db } from "@/db";
+import { adminPageAccessPolicy } from "@/admin-auth/authorization-policy";
+import { requireAdminPermission, type ActiveAdminPrincipal } from "@/admin-auth/rbac-guards";
 import {
   companies,
   companyJobCreditTransactions,
@@ -24,7 +26,8 @@ interface SalesQueryParams {
   creditSort: CreditSort;
 }
 
-export async function getAdminSales(params: SalesQueryParams, now = new Date()) {
+export async function getAdminSales(principal: ActiveAdminPrincipal, params: SalesQueryParams, now = new Date()) {
+  await requireAdminPermission(adminPageAccessPolicy.sales, principal);
   const rangeStart = getSalesRangeStart(params.range, now);
   const bucket = salesRanges[params.range].bucket;
   const bucketExpression = bucket === "day"

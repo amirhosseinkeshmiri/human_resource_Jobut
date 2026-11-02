@@ -1,9 +1,10 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useRef, useState, useTransition, type BaseSyntheticEvent, type KeyboardEvent } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition, type BaseSyntheticEvent, type KeyboardEvent } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import { Button, FormField, Input, Select } from "@/components/ui";
+import { clearFormDraft, loadFormDraft, saveFormDraft, type FormDraftOptions } from "@/forms/form-draft";
 import {
   employmentTypeLabels,
   employmentTypes,
@@ -34,12 +35,72 @@ interface JobPostFormProps {
   initialValues?: JobPostFormDefaults;
   submitLabel: string;
   serverError?: string;
+  draftAccountId: string;
+  draftEntityId: string;
+  draftBaselineUpdatedAt?: number;
+  clearDraftEntityId?: string;
+  submissionSucceeded?: boolean;
 }
 
-export function JobPostForm({ action, initialValues, submitLabel, serverError }: JobPostFormProps) {
+const JOB_DRAFT_FIELDS = [
+  "title",
+  "workplaceType",
+  "employmentType",
+  "location",
+  "seniorityLevel",
+  "salaryMin",
+  "salaryMax",
+  "salaryNegotiable",
+  "requiredSkills",
+  "description",
+] as const;
+
+function sanitizeEditorDraftHtml(value: unknown) {
+  const template = document.createElement("template");
+  template.innerHTML = typeof value === "string" ? value : "";
+  const allowedTags = new Set(["P", "BR", "STRONG", "B", "UL", "OL", "LI"]);
+  for (const element of Array.from(template.content.querySelectorAll("*"))) {
+    if (!allowedTags.has(element.tagName)) {
+      element.replaceWith(...Array.from(element.childNodes));
+      continue;
+    }
+    for (const attribute of Array.from(element.attributes)) element.removeAttribute(attribute.name);
+  }
+  return template.innerHTML;
+}
+
+export function JobPostForm({
+  action,
+  initialValues,
+  submitLabel,
+  serverError,
+  draftAccountId,
+  draftEntityId,
+  draftBaselineUpdatedAt = 0,
+  clearDraftEntityId,
+  submissionSucceeded = false,
+}: JobPostFormProps) {
   const [skillInput, setSkillInput] = useState("");
   const [isPending, startTransition] = useTransition();
   const editorRef = useRef<HTMLDivElement>(null);
+  const skipNextDraftSaveRef = useRef(false);
+  const pendingDraftSaveRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const initialFormValues = useMemo(() => ({
+    title: initialValues?.title ?? "",
+    workplaceType: initialValues?.workplaceType ?? undefined,
+    employmentType: initialValues?.employmentType ?? undefined,
+    location: initialValues?.location ?? "",
+    seniorityLevel: initialValues?.seniorityLevel ?? undefined,
+    salaryMin: initialValues?.salaryMin ?? null,
+    salaryMax: initialValues?.salaryMax ?? null,
+    salaryNegotiable: initialValues?.salaryNegotiable ?? false,
+    requiredSkills: initialValues?.requiredSkills ?? [],
+    description: initialValues?.description ?? "",
+  }), [initialValues]);
+  const draftOptions = useMemo<FormDraftOptions>(() => ({
+    scope: { accountId: draftAccountId, formId: "job-post", entityId: draftEntityId },
+    allowedFields: JOB_DRAFT_FIELDS,
+  }), [draftAccountId, draftEntityId]);
   const {
     register,
     setValue,
@@ -47,26 +108,71 @@ export function JobPostForm({ action, initialValues, submitLabel, serverError }:
     clearErrors,
     handleSubmit,
     control,
-    formState: { errors },
+    reset,
+    subscribe,
+    formState: { errors, isDirty },
   } = useForm<JobPostFormValues>({
     resolver: zodResolver(jobPostFormSchema),
-    defaultValues: {
-      title: initialValues?.title ?? "",
-      workplaceType: initialValues?.workplaceType ?? undefined,
-      employmentType: initialValues?.employmentType ?? undefined,
-      location: initialValues?.location ?? "",
-      seniorityLevel: initialValues?.seniorityLevel ?? undefined,
-      salaryMin: initialValues?.salaryMin ?? null,
-      salaryMax: initialValues?.salaryMax ?? null,
-      salaryNegotiable: initialValues?.salaryNegotiable ?? false,
-      requiredSkills: initialValues?.requiredSkills ?? [],
-      description: initialValues?.description ?? "",
-    },
+    defaultValues: initialFormValues,
   });
 
   const skills = useWatch({ control, name: "requiredSkills" });
   const salaryNegotiable = useWatch({ control, name: "salaryNegotiable" });
   const description = useWatch({ control, name: "description" });
+
+  useEffect(() => {
+    if (submissionSucceeded) {
+      clearFormDraft(window.localStorage, draftOptions.scope);
+      return;
+    }
+    if (clearDraftEntityId) {
+      clearFormDraft(window.localStorage, { ...draftOptions.scope, entityId: clearDraftEntityId });
+    }
+    if (isDirty) return;
+    const draft = loadFormDraft<JobPostFormValues>(window.localStorage, draftOptions, draftBaselineUpdatedAt);
+    if (!draft) return;
+    const restored = {
+      ...initialFormValues,
+      ...draft.values,
+      description: sanitizeEditorDraftHtml(draft.values.description),
+    };
+    reset(restored);
+    if (editorRef.current) editorRef.current.innerHTML = restored.description ?? "";
+  }, [clearDraftEntityId, draftBaselineUpdatedAt, draftOptions, initialFormValues, isDirty, reset, submissionSucceeded]);
+
+  useEffect(() => {
+    const unsubscribe = subscribe({
+      formState: { values: true },
+      callback: ({ values }) => {
+        if (skipNextDraftSaveRef.current) {
+          skipNextDraftSaveRef.current = false;
+          return;
+        }
+        if (pendingDraftSaveRef.current) clearTimeout(pendingDraftSaveRef.current);
+        pendingDraftSaveRef.current = setTimeout(() => {
+          saveFormDraft(window.localStorage, draftOptions, values as Record<string, unknown>);
+          pendingDraftSaveRef.current = undefined;
+        }, 350);
+      },
+    });
+    return () => {
+      if (pendingDraftSaveRef.current) clearTimeout(pendingDraftSaveRef.current);
+      unsubscribe();
+    };
+  }, [draftOptions, subscribe]);
+
+  function discardDraft() {
+    if (pendingDraftSaveRef.current) {
+      clearTimeout(pendingDraftSaveRef.current);
+      pendingDraftSaveRef.current = undefined;
+    }
+    clearFormDraft(window.localStorage, draftOptions.scope);
+    skipNextDraftSaveRef.current = true;
+    reset(initialFormValues);
+    queueMicrotask(() => { skipNextDraftSaveRef.current = false; });
+    setSkillInput("");
+    if (editorRef.current) editorRef.current.innerHTML = initialFormValues.description ?? "";
+  }
 
   function addSkill() {
     const skill = skillInput.trim().replace(/\s+/g, " ");
@@ -211,7 +317,10 @@ export function JobPostForm({ action, initialValues, submitLabel, serverError }:
         {errors.description?.message ? <p className="text-helper text-danger">{errors.description.message}</p> : null}
       </div>
 
-      <Button type="submit" loading={isPending} className="w-full sm:w-auto sm:justify-self-end">{submitLabel}</Button>
+      <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+        <Button type="button" variant="ghost" onClick={discardDraft} disabled={isPending}>حذف پیش‌نویس محلی</Button>
+        <Button type="submit" loading={isPending} className="w-full sm:w-auto">{submitLabel}</Button>
+      </div>
     </form>
   );
 }

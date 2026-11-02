@@ -75,17 +75,20 @@ export const resumeLanguageSchema = z.object({
   proficiency: z.enum(languageProficiencies, { error: "سطح زبان معتبر نیست." }),
 });
 
-export const candidateResumeSchema = z.object({
+export const candidateBasicProfileSchema = z.object({
   firstName: requiredShortText("نام", 100),
   lastName: requiredShortText("نام خانوادگی", 120),
   city: requiredShortText("شهر", 160),
   professionalTitle: requiredShortText("عنوان حرفه‌ای", 160),
   professionalSummary: z.string().trim().min(1, "خلاصه حرفه‌ای را وارد کنید.").max(2_000, "خلاصه حرفه‌ای بیش از حد طولانی است."),
+  linkedinUrl: optionalUrl("linkedin"),
+  portfolioUrl: optionalUrl("portfolio"),
+});
+
+export const candidateResumeSchema = candidateBasicProfileSchema.extend({
   skills: z.array(z.string().transform((value) => value.trim().replace(/\s+/g, " ")).pipe(
     z.string().min(1, "مهارت خالی معتبر نیست.").max(RESUME_SKILL_MAX_LENGTH, "عنوان مهارت بیش از حد طولانی است."),
   )).min(1, "حداقل یک مهارت وارد کنید.").max(RESUME_SKILLS_MAX, "حداکثر ۱۰ مهارت مجاز است."),
-  linkedinUrl: optionalUrl("linkedin"),
-  portfolioUrl: optionalUrl("portfolio"),
   experiences: z.array(resumeExperienceSchema).max(RESUME_NESTED_ITEMS_MAX, "تعداد سوابق شغلی بیش از حد مجاز است."),
   educations: z.array(resumeEducationSchema).max(RESUME_NESTED_ITEMS_MAX, "تعداد سوابق تحصیلی بیش از حد مجاز است."),
   languages: z.array(resumeLanguageSchema).max(RESUME_NESTED_ITEMS_MAX, "تعداد زبان‌ها بیش از حد مجاز است."),
@@ -106,3 +109,5 @@ export const candidateResumeSchema = z.object({
 
 export type CandidateResumeInput = z.input<typeof candidateResumeSchema>;
 export type CandidateResumeValues = z.output<typeof candidateResumeSchema>;
+export type CandidateBasicProfileInput = z.input<typeof candidateBasicProfileSchema>;
+export type CandidateBasicProfileValues = z.output<typeof candidateBasicProfileSchema>;

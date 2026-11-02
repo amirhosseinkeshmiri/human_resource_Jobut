@@ -1,6 +1,8 @@
 import "server-only";
 import { and, asc, count, desc, eq, gt, ilike, isNotNull, lte, or, sql, type SQL } from "drizzle-orm";
 import { db } from "@/db";
+import { adminPageAccessPolicy } from "@/admin-auth/authorization-policy";
+import { requireAdminPermission, type ActiveAdminPrincipal } from "@/admin-auth/rbac-guards";
 import { companies, industries, jobPosts } from "@/db/schema";
 import {
   ADMIN_JOBS_PAGE_SIZE,
@@ -50,7 +52,8 @@ function sortOrder(sort: AdminJobSort): SQL {
   }
 }
 
-export async function getAdminJobs(params: AdminJobsParams, now = new Date()) {
+export async function getAdminJobs(principal: ActiveAdminPrincipal, params: AdminJobsParams, now = new Date()) {
+  await requireAdminPermission(adminPageAccessPolicy.jobs, principal);
   const searchCondition = params.query
     ? or(ilike(jobPosts.title, `%${params.query}%`), ilike(companies.name, `%${params.query}%`))
     : undefined;
@@ -87,7 +90,8 @@ export async function getAdminJobs(params: AdminJobsParams, now = new Date()) {
   return { items, total: totalRow.value, page, pageCount, now };
 }
 
-export async function getAdminJobDetail(jobId: string) {
+export async function getAdminJobDetail(principal: ActiveAdminPrincipal, jobId: string) {
+  await requireAdminPermission(adminPageAccessPolicy.jobs, principal);
   if (!isJobId(jobId)) return null;
 
   const [job] = await db
