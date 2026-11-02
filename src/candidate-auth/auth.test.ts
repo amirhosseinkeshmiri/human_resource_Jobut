@@ -59,7 +59,7 @@ test("Candidate and Employer sessions cannot be accepted across auth surfaces", 
   assert.notEqual(getTableName(candidateSessions), getTableName(employerSessions));
 });
 
-test("Candidate logout scope is isolated from Employer session state", () => {
+test("Candidate and Employer browser sessions have distinct records for explicit joint logout cleanup", () => {
   assert.equal(getTableName(candidateSessions), "candidate_sessions");
   assert.equal(getTableName(employerSessions), "employer_sessions");
   assert.equal(CANDIDATE_SESSION_COOKIE, "jobut_candidate_session");

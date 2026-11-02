@@ -3,13 +3,16 @@
 import { and, desc, eq, isNull, sql } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import { db } from "@/db";
-import { candidateAccounts, candidateAuthChallenges, candidateSessions } from "@/db/schema";
+import { candidateAccounts, candidateAuthChallenges, candidateSessions, employerSessions } from "@/db/schema";
+import { getBrowserAccountContext } from "@/auth/browser-account-context";
+import { clearBrowserSessionCookies, getBrowserSessionTokens } from "@/auth/browser-session";
 import {
   MAX_VERIFICATION_ATTEMPTS,
   getChallengeAvailability,
 } from "@/auth/challenge-policy";
 import {
   digestVerificationCode,
+  digestSessionToken,
   getAuthSecret,
   verificationCodeMatches,
 } from "@/auth/crypto";
@@ -47,6 +50,10 @@ export async function requestCandidateVerificationCode(
   if (!requestInspection.trusted) {
     logAuthOriginRejection("candidate", requestInspection);
     return { status: "error", message: "درخواست ارسال کد معتبر نیست." };
+  }
+  const accountContext = await getBrowserAccountContext();
+  if (accountContext.context === "employer" || accountContext.context === "conflict") {
+    return { status: "error", message: "برای ورود به حساب کارجو ابتدا از حساب فعلی خارج شوید." };
   }
   const formInspection = inspectBoundedAuthFormData(formData, ["identifier"]);
   if (!formInspection.valid) {
@@ -156,6 +163,13 @@ export async function verifyCandidateCode(
   }
   if (!code) return { status: "error", message: "کد ورود باید ۶ رقم باشد." };
 
+  const accountContext = await getBrowserAccountContext();
+  if (accountContext.context === "employer" || accountContext.context === "conflict") {
+    return { status: "error", message: "برای ورود به حساب کارجو ابتدا از حساب فعلی خارج شوید." };
+  }
+
+  const browserSessions = await getBrowserSessionTokens();
+
   const session = await db.transaction(async (transaction) => {
     const [challenge] = await transaction
       .select()
@@ -215,6 +229,12 @@ export async function verifyCandidateCode(
     if (!account) throw new Error("Candidate account could not be resolved");
 
     const sessionMaterial = createCandidateSessionMaterial(account.id);
+    if (browserSessions.employerToken) {
+      await transaction.delete(employerSessions).where(eq(employerSessions.tokenDigest, digestSessionToken(browserSessions.employerToken)));
+    }
+    if (browserSessions.candidateToken) {
+      await transaction.delete(candidateSessions).where(eq(candidateSessions.tokenDigest, digestSessionToken(browserSessions.candidateToken)));
+    }
     await transaction.insert(candidateSessions).values(sessionMaterial.record);
     await transaction
       .update(candidateAuthChallenges)
@@ -226,6 +246,7 @@ export async function verifyCandidateCode(
 
   if ("error" in session) return { status: "error", message: session.error };
 
+  await clearBrowserSessionCookies();
   await setCandidateSessionCookie(session.token, session.record.expiresAt);
   redirect("/candidate");
 }

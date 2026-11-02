@@ -2,8 +2,10 @@ import Link from "next/link";
 import { BrandLogo } from "@/components/brand/brand-logo";
 import { Container } from "@/components/ui/container";
 import { PublicNavigation } from "./public-navigation";
+import { getBrowserNavigationIdentity } from "@/auth/browser-account-context";
 
-export function PublicHeader() {
+export async function PublicHeader() {
+  const identity = await getBrowserNavigationIdentity();
   return (
     <header className="sticky top-0 z-30 border-b border-ui-border bg-surface/95 shadow-[0_1px_0_rgb(20_33_145/0.03)] backdrop-blur-sm">
       <Container className="relative flex h-[4.5rem] items-center gap-5">
@@ -14,7 +16,7 @@ export function PublicHeader() {
         >
           <BrandLogo priority className="w-[4.5rem] sm:w-20" />
         </Link>
-        <PublicNavigation />
+        <PublicNavigation identity={identity} />
       </Container>
     </header>
   );

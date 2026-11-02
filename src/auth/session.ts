@@ -1,10 +1,10 @@
 import "server-only";
-import { and, eq, gt } from "drizzle-orm";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { db } from "@/db";
-import { employerAccounts, employerSessions } from "@/db/schema";
-import { digestSessionToken } from "./crypto";
+import { employerSessions } from "@/db/schema";
+import { getBrowserAccountContext } from "./browser-account-context";
+import { destroyBrowserSessions } from "./browser-session";
 import { createEmployerSessionMaterial } from "./session-material";
 import { EMPLOYER_SESSION_COOKIE } from "./session-cookies";
 import { sessionCookieOptions } from "./session-cookie-options";
@@ -23,26 +23,8 @@ export async function setEmployerSessionCookie(token: string, expiresAt: Date) {
 }
 
 export async function getCurrentEmployer() {
-  const token = (await cookies()).get(EMPLOYER_SESSION_COOKIE)?.value;
-  if (!token) return null;
-
-  const [employer] = await db
-    .select({
-      id: employerAccounts.id,
-      email: employerAccounts.email,
-      mobile: employerAccounts.mobile,
-    })
-    .from(employerSessions)
-    .innerJoin(employerAccounts, eq(employerSessions.employerAccountId, employerAccounts.id))
-    .where(
-      and(
-        eq(employerSessions.tokenDigest, digestSessionToken(token)),
-        gt(employerSessions.expiresAt, new Date()),
-      ),
-    )
-    .limit(1);
-
-  return employer ?? null;
+  const accountContext = await getBrowserAccountContext();
+  return accountContext.context === "employer" ? accountContext.employer : null;
 }
 
 export async function requireEmployer() {
@@ -52,14 +34,5 @@ export async function requireEmployer() {
 }
 
 export async function destroyEmployerSession() {
-  const cookieStore = await cookies();
-  const token = cookieStore.get(EMPLOYER_SESSION_COOKIE)?.value;
-
-  if (token) {
-    await db
-      .delete(employerSessions)
-      .where(eq(employerSessions.tokenDigest, digestSessionToken(token)));
-  }
-
-  cookieStore.set(EMPLOYER_SESSION_COOKIE, "", sessionCookieOptions(new Date(0)));
+  await destroyBrowserSessions();
 }

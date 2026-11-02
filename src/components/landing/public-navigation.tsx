@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import { buttonClassNames } from "@/components/ui/button";
 import { classNames } from "@/lib/class-names";
 import { PUBLIC_JOBS_LABEL, PUBLIC_JOBS_ROUTE } from "@/jobs/public-copy";
+import { logoutBrowserAccount } from "@/auth/browser-session-actions";
 
 interface NavigationItem {
   label: string;
@@ -47,7 +48,24 @@ function NavigationLinks({ pathname, onNavigate }: { pathname: string; onNavigat
   });
 }
 
-export function PublicNavigation() {
+interface PublicNavigationProps {
+  identity: { role: "candidate" | "employer" | "conflict"; displayName: string } | null;
+}
+
+function AccountActions({ identity, mobile = false, onNavigate }: PublicNavigationProps & { mobile?: boolean; onNavigate?: () => void }) {
+  if (!identity) return <>
+    <Link href="/login/candidate" onClick={onNavigate} className={buttonClassNames({ variant: mobile ? "secondary" : "ghost", size: mobile ? undefined : "small", className: mobile ? "w-full" : undefined })}>ورود کارجو</Link>
+    <Link href="/login/employer" onClick={onNavigate} className={buttonClassNames({ size: mobile ? undefined : "small", className: mobile ? "w-full" : "px-4" })}>ورود کارفرما</Link>
+  </>;
+
+  const dashboard = identity.role === "candidate" ? "/candidate" : identity.role === "employer" ? "/employer" : null;
+  return <>
+    {dashboard ? <Link href={dashboard} onClick={onNavigate} className={buttonClassNames({ variant: "secondary", size: mobile ? undefined : "small", className: mobile ? "w-full" : undefined })}>{identity.displayName}</Link> : <span className="px-2 text-sm font-semibold text-danger">{identity.displayName}</span>}
+    <form action={logoutBrowserAccount} className={mobile ? "w-full" : undefined}><button type="submit" className={buttonClassNames({ variant: "ghost", size: mobile ? undefined : "small", className: mobile ? "w-full" : undefined })}>خروج</button></form>
+  </>;
+}
+
+export function PublicNavigation({ identity }: PublicNavigationProps) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -75,12 +93,7 @@ export function PublicNavigation() {
       </nav>
 
       <div className="ms-auto hidden shrink-0 items-center gap-2 xl:flex">
-        <Link href="/login/candidate" className={buttonClassNames({ variant: "ghost", size: "small" })}>
-          ورود کارجو
-        </Link>
-        <Link href="/login/employer" className={buttonClassNames({ size: "small", className: "px-4" })}>
-          ورود کارفرما
-        </Link>
+        <AccountActions identity={identity} />
       </div>
 
       <button
@@ -109,12 +122,7 @@ export function PublicNavigation() {
             <NavigationLinks pathname={pathname} onNavigate={closeMenu} />
           </nav>
           <div className="mt-3 grid gap-2 border-t border-ui-border pt-3 sm:grid-cols-2">
-            <Link href="/login/candidate" onClick={closeMenu} className={buttonClassNames({ variant: "secondary", className: "w-full" })}>
-              ورود کارجو
-            </Link>
-            <Link href="/login/employer" onClick={closeMenu} className={buttonClassNames({ className: "w-full" })}>
-              ورود کارفرما
-            </Link>
+            <AccountActions identity={identity} mobile onNavigate={closeMenu} />
           </div>
         </div>
       ) : null}

@@ -7,13 +7,17 @@ import {
   employerAccounts,
   employerAuthChallenges,
   employerSessions,
+  candidateSessions,
 } from "@/db/schema";
+import { getBrowserAccountContext } from "./browser-account-context";
+import { clearBrowserSessionCookies, getBrowserSessionTokens } from "./browser-session";
 import {
   MAX_VERIFICATION_ATTEMPTS,
   getChallengeAvailability,
 } from "./challenge-policy";
 import {
   digestVerificationCode,
+  digestSessionToken,
   getAuthSecret,
   verificationCodeMatches,
 } from "./crypto";
@@ -54,6 +58,10 @@ export async function requestEmployerVerificationCode(
   if (!requestInspection.trusted) {
     logAuthOriginRejection("employer", requestInspection);
     return { status: "error", message: "درخواست ارسال کد معتبر نیست." };
+  }
+  const accountContext = await getBrowserAccountContext();
+  if (accountContext.context === "candidate" || accountContext.context === "conflict") {
+    return { status: "error", message: "برای ورود به حساب کارفرما ابتدا از حساب فعلی خارج شوید." };
   }
   const formInspection = inspectBoundedAuthFormData(formData, ["identifier"]);
   if (!formInspection.valid) {
@@ -170,6 +178,13 @@ export async function verifyEmployerCode(
     return { status: "error", message: "کد ورود باید ۶ رقم باشد." };
   }
 
+  const accountContext = await getBrowserAccountContext();
+  if (accountContext.context === "candidate" || accountContext.context === "conflict") {
+    return { status: "error", message: "برای ورود به حساب کارفرما ابتدا از حساب فعلی خارج شوید." };
+  }
+
+  const browserSessions = await getBrowserSessionTokens();
+
   const session = await db.transaction(async (transaction) => {
     const [challenge] = await transaction
       .select()
@@ -234,6 +249,12 @@ export async function verifyEmployerCode(
     if (!account) throw new Error("Employer account could not be resolved");
 
     const sessionMaterial = createEmployerSessionMaterial(account.id);
+    if (browserSessions.candidateToken) {
+      await transaction.delete(candidateSessions).where(eq(candidateSessions.tokenDigest, digestSessionToken(browserSessions.candidateToken)));
+    }
+    if (browserSessions.employerToken) {
+      await transaction.delete(employerSessions).where(eq(employerSessions.tokenDigest, digestSessionToken(browserSessions.employerToken)));
+    }
     await transaction.insert(employerSessions).values(sessionMaterial.record);
     await transaction
       .update(employerAuthChallenges)
@@ -245,6 +266,7 @@ export async function verifyEmployerCode(
 
   if ("error" in session) return { status: "error", message: session.error };
 
+  await clearBrowserSessionCookies();
   await setEmployerSessionCookie(session.token, session.record.expiresAt);
   redirect("/employer");
 }
