@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import {
-  APPLICATION_STATUSES,
   applicationStatusLabels,
+  getEnabledApplicationStatuses,
   parseApplicationStatusFilter,
   type ApplicationStatusFilter,
 } from "@/applications/status-policy";
@@ -48,7 +48,7 @@ export default async function EmployerJobApplicationsPage({ params, searchParams
 
   const filters = [
     { value: "all" as const, label: "همه", count: data.allCount },
-    ...APPLICATION_STATUSES.map((status) => ({
+    ...getEnabledApplicationStatuses().map((status) => ({
       value: status,
       label: applicationStatusLabels[status],
       count: data.statusCounts[status],

@@ -21,6 +21,7 @@ export interface CandidateApplicationMetrics {
   interview: number;
   rejected: number;
   hired: number;
+  withdrawn: number;
 }
 
 export function buildCandidateDashboardProfile(profile: CandidateRecommendationProfile | null) {
@@ -81,6 +82,7 @@ export function normalizeCandidateApplicationMetrics(
     interview: Number(metrics.interview),
     rejected: Number(metrics.rejected),
     hired: Number(metrics.hired),
+    withdrawn: Number(metrics.withdrawn),
   };
 }
 
@@ -94,6 +96,7 @@ export function countCandidateApplicationStatuses(
     interview: 0,
     rejected: 0,
     hired: 0,
+    withdrawn: 0,
   };
   for (const status of statuses) counts[status] += 1;
   return counts;

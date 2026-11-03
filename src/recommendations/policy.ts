@@ -9,6 +9,14 @@ type EmploymentType = (typeof employmentTypes)[number];
 type SeniorityLevel = (typeof seniorityLevels)[number];
 
 export const RECOMMENDATION_LIMIT = 20;
+export const RECOMMENDATION_SCORE_WEIGHTS = {
+  skill: 10,
+  preferredLocation: 4,
+  preferredWorkplace: 3,
+  preferredEmployment: 3,
+  preferredSeniority: 3,
+  resumeCityFallback: 2,
+} as const;
 
 export interface RecommendationProfile {
   skills: string[];
@@ -40,8 +48,26 @@ export interface RecommendationReasons {
   resumeCityMatched: boolean;
 }
 
-function normalizeText(value: string) {
-  return value.trim().replace(/\s+/g, " ").toLocaleLowerCase("fa-IR");
+export function normalizeRecommendationText(value: string) {
+  return value
+    .normalize("NFKC")
+    .replace(/[يى]/g, "ی")
+    .replace(/ك/g, "ک")
+    .replace(/[\u0640-\u065f\u0670]/g, "")
+    .replace(/[\u200c\u200d]/g, " ")
+    .trim()
+    .replace(/\s+/g, " ")
+    .toLocaleLowerCase("fa-IR");
+}
+
+export function deduplicateDisplaySkills(skills: readonly string[]) {
+  const seen = new Set<string>();
+  return skills.filter((skill) => {
+    const normalized = normalizeRecommendationText(skill);
+    if (!normalized || seen.has(normalized)) return false;
+    seen.add(normalized);
+    return true;
+  });
 }
 
 function scoreRecommendation(
@@ -50,17 +76,17 @@ function scoreRecommendation(
 ) {
   if (!job.publiclyEligible || job.alreadyApplied || profile.skills.length === 0) return null;
 
-  const skillSet = new Set(profile.skills.map(normalizeText));
-  const matchedSkills = job.requiredSkills.filter((skill) => skillSet.has(normalizeText(skill)));
-  const normalizedLocation = normalizeText(job.location);
+  const skillSet = new Set(profile.skills.map(normalizeRecommendationText));
+  const matchedSkills = deduplicateDisplaySkills(job.requiredSkills.filter((skill) => skillSet.has(normalizeRecommendationText(skill))));
+  const normalizedLocation = normalizeRecommendationText(job.location);
   const locationMatched = profile.preferredLocations.some(
-    (location) => normalizeText(location) === normalizedLocation,
+    (location) => normalizeRecommendationText(location) === normalizedLocation,
   );
   const workplaceMatched = profile.preferredWorkplaceTypes.includes(job.workplaceType);
   const employmentMatched = profile.preferredEmploymentTypes.includes(job.employmentType);
   const seniorityMatched = profile.preferredSeniorityLevels.includes(job.seniorityLevel);
   const resumeCityMatched = profile.preferredLocations.length === 0
-    && normalizeText(profile.city) === normalizedLocation;
+    && normalizeRecommendationText(profile.city) === normalizedLocation;
   const explicitPreferenceMatches = [
     locationMatched,
     workplaceMatched,
@@ -72,12 +98,12 @@ function scoreRecommendation(
 
   return {
     job,
-    score: (matchedSkills.length * 10)
-      + (locationMatched ? 4 : 0)
-      + (workplaceMatched ? 3 : 0)
-      + (employmentMatched ? 3 : 0)
-      + (seniorityMatched ? 3 : 0)
-      + (resumeCityMatched ? 2 : 0),
+    score: (matchedSkills.length * RECOMMENDATION_SCORE_WEIGHTS.skill)
+      + (locationMatched ? RECOMMENDATION_SCORE_WEIGHTS.preferredLocation : 0)
+      + (workplaceMatched ? RECOMMENDATION_SCORE_WEIGHTS.preferredWorkplace : 0)
+      + (employmentMatched ? RECOMMENDATION_SCORE_WEIGHTS.preferredEmployment : 0)
+      + (seniorityMatched ? RECOMMENDATION_SCORE_WEIGHTS.preferredSeniority : 0)
+      + (resumeCityMatched ? RECOMMENDATION_SCORE_WEIGHTS.resumeCityFallback : 0),
     reasons: {
       matchedSkills,
       locationMatched,
@@ -87,6 +113,17 @@ function scoreRecommendation(
       resumeCityMatched,
     } satisfies RecommendationReasons,
   };
+}
+
+export function buildRecommendationReasonLabels(reasons: RecommendationReasons) {
+  return [
+    reasons.matchedSkills.length ? `مهارت مشترک: ${reasons.matchedSkills.slice(0, 3).join("، ")}` : null,
+    reasons.locationMatched ? "شهر موردنظر شما" : null,
+    reasons.workplaceMatched ? "نحوه حضور موردنظر شما" : null,
+    reasons.employmentMatched ? "نوع همکاری موردنظر شما" : null,
+    reasons.seniorityMatched ? "سطح شغلی موردنظر شما" : null,
+    reasons.resumeCityMatched ? "هم‌راستا با شهر رزومه" : null,
+  ].filter((reason): reason is string => reason !== null);
 }
 
 export function rankRecommendationCandidates(

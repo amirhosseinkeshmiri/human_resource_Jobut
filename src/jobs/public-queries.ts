@@ -1,6 +1,6 @@
 import "server-only";
 import { cache } from "react";
-import { and, count, desc, eq, gt, isNotNull, or, sql, type SQL } from "drizzle-orm";
+import { and, asc, count, desc, eq, gt, gte, isNotNull, or, sql, type SQL } from "drizzle-orm";
 import { db } from "@/db";
 import { companies, industries, jobPosts } from "@/db/schema";
 import { getPublicJobsOffset, getPublicJobsPageCount, PUBLIC_JOBS_PAGE_SIZE, type PublicJobFilters } from "./public-search";
@@ -44,7 +44,29 @@ export function publicJobSearchConditions(filters: PublicJobFilters, now: Date):
     filters.workplace ? eq(jobPosts.workplaceType, filters.workplace) : undefined,
     filters.employment ? eq(jobPosts.employmentType, filters.employment) : undefined,
     filters.seniority ? eq(jobPosts.seniorityLevel, filters.seniority) : undefined,
+    filters.salaryType === "fixed" || filters.minSalary !== null ? eq(jobPosts.salaryNegotiable, false) : undefined,
+    filters.salaryType === "negotiable" ? eq(jobPosts.salaryNegotiable, true) : undefined,
+    filters.minSalary !== null ? gte(jobPosts.salaryMax, filters.minSalary) : undefined,
   )!;
+}
+
+function publicJobOrder(sort: PublicJobFilters["sort"]) {
+  if (sort === "oldest") return [asc(jobPosts.publishedAt), asc(jobPosts.id)] as const;
+  if (sort === "salary_asc") return [
+    asc(sql`case when ${jobPosts.salaryNegotiable} = true then 1 else 0 end`),
+    asc(jobPosts.salaryMin),
+    asc(jobPosts.salaryMax),
+    desc(jobPosts.publishedAt),
+    desc(jobPosts.id),
+  ] as const;
+  if (sort === "salary_desc") return [
+    asc(sql`case when ${jobPosts.salaryNegotiable} = true then 1 else 0 end`),
+    desc(jobPosts.salaryMin),
+    desc(jobPosts.salaryMax),
+    desc(jobPosts.publishedAt),
+    desc(jobPosts.id),
+  ] as const;
+  return [desc(jobPosts.publishedAt), desc(jobPosts.id)] as const;
 }
 
 export async function getPublicJobs(filters: PublicJobFilters, now = new Date()) {
@@ -79,7 +101,7 @@ export async function getPublicJobs(filters: PublicJobFilters, now = new Date())
     .innerJoin(companies, eq(jobPosts.companyId, companies.id))
     .innerJoin(industries, eq(companies.industryId, industries.id))
     .where(conditions)
-    .orderBy(desc(jobPosts.publishedAt), desc(jobPosts.id))
+    .orderBy(...publicJobOrder(filters.sort))
     .limit(PUBLIC_JOBS_PAGE_SIZE)
     .offset(getPublicJobsOffset(page));
 

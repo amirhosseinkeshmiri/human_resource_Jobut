@@ -14,6 +14,9 @@ import { sanitizeJobDescription } from "@/jobs/description";
 import { formatJobSalary } from "@/jobs/public-policy";
 import { getPublicJobById } from "@/jobs/public-queries";
 import { employmentTypeLabels, seniorityLevelLabels, workplaceTypeLabels } from "@/jobs/validation";
+import { SaveJobControl } from "@/components/jobs/save-job-control";
+import { isCandidateSavedJobsEnabled } from "@/saved-jobs/policy";
+import { isCandidateJobSaved } from "@/saved-jobs/queries";
 
 export const dynamic = "force-dynamic";
 
@@ -41,6 +44,8 @@ export default async function PublicJobPage({ params, searchParams }: PublicJobP
   if (!job) notFound();
   const applicationOutcome = Array.isArray(query.application) ? query.application[0] : query.application;
   const candidateState = candidate ? await getCandidateApplyState(candidate.id, job.id) : null;
+  const savingEnabled = Boolean(candidate) && isCandidateSavedJobsEnabled();
+  const saved = savingEnabled && candidate ? await isCandidateJobSaved(candidate.id, job.id) : false;
   const applicationEligibility = getApplicationEligibility({
     authenticated: Boolean(candidate),
     resumeComplete: candidateState?.resumeComplete ?? false,
@@ -111,6 +116,8 @@ export default async function PublicJobPage({ params, searchParams }: PublicJobP
                 {applicationEligibility === "eligible" ? <><p className="text-secondary mt-2">رزومه فعلی شما در شبکه استخدامی متخصصین آکادمیک برای این فرصت ارسال می‌شود.</p><ApplicationSubmitForm action={applyToJob} jobPostId={job.id} /></> : null}
                 {applicationEligibility === "job-unavailable" ? <p className="text-secondary mt-2">این آگهی دیگر فعال نیست.</p> : null}
               </Card>
+
+              {savingEnabled ? <Card className="shadow-none"><h2 className="text-card-title">ذخیره فرصت شغلی</h2><p className="text-secondary mt-2">این فرصت را برای بررسی دوباره در پنل کارجو نگه دارید.</p><div className="mt-4"><SaveJobControl jobPostId={job.id} initiallySaved={saved} /></div></Card> : null}
 
               <Link href="/jobs" className={buttonClassNames({ variant: "secondary", className: "w-full" })}>مشاهده سایر فرصت‌های شغلی</Link>
             </aside>

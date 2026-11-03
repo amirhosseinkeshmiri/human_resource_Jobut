@@ -42,6 +42,7 @@ export const PRIVATE_ROUTE_PATTERNS = [
   "/employer/:path*",
   "/login/:path*",
   "/api/payments/:path*",
+  "/api/candidate/:path*",
 ] as const;
 
 export function productionSecurityHeaders(isProduction: boolean, hstsEnabled: boolean) {

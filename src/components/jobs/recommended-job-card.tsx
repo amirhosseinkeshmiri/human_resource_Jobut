@@ -4,6 +4,8 @@ import {
   workplaceTypeLabels,
 } from "@/jobs/validation";
 import { JobOpportunityCard } from "./job-opportunity-card";
+import { buildRecommendationReasonLabels } from "@/recommendations/policy";
+import { SaveJobControl } from "./save-job-control";
 
 interface RecommendedJobCardProps {
   job: {
@@ -24,20 +26,17 @@ interface RecommendedJobCardProps {
     seniorityMatched: boolean;
     resumeCityMatched: boolean;
   };
+  savingEnabled?: boolean;
+  saved?: boolean;
 }
 
-export function RecommendedJobCard({ job }: RecommendedJobCardProps) {
-  const reasons = [
-    job.locationMatched ? "محل موردنظر شما" : null,
-    job.workplaceMatched ? "نحوه حضور موردنظر شما" : null,
-    job.employmentMatched ? "نوع همکاری موردنظر شما" : null,
-    job.seniorityMatched ? "سطح شغلی موردنظر شما" : null,
-    job.resumeCityMatched ? "هم‌راستا با شهر رزومه شما" : null,
-  ].filter((reason): reason is string => reason !== null);
+export function RecommendedJobCard({ job, savingEnabled = false, saved = false }: RecommendedJobCardProps) {
+  const reasons = buildRecommendationReasonLabels(job);
   return <JobOpportunityCard
     job={job}
     skills={job.matchedSkills}
-    skillSummary={job.matchedSkills.length ? `${job.matchedSkills.length.toLocaleString("fa-IR")} مهارت مشترک` : undefined}
+    skillSummary={job.matchedSkills.length ? "مهارت‌های منطبق" : undefined}
     reasons={reasons}
+    footerAction={savingEnabled ? <SaveJobControl jobPostId={job.id} initiallySaved={saved} /> : undefined}
   />;
 }

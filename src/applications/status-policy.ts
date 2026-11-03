@@ -4,6 +4,7 @@ export const APPLICATION_STATUSES = [
   "interview",
   "rejected",
   "hired",
+  "withdrawn",
 ] as const;
 
 export type ApplicationStatus = (typeof APPLICATION_STATUSES)[number];
@@ -15,6 +16,7 @@ export const applicationStatusLabels: Record<ApplicationStatus, string> = {
   interview: "مصاحبه",
   rejected: "رد شده",
   hired: "استخدام شده",
+  withdrawn: "انصراف داده‌شده",
 };
 
 const transitions: Record<ApplicationStatus, readonly ApplicationStatus[]> = {
@@ -23,7 +25,24 @@ const transitions: Record<ApplicationStatus, readonly ApplicationStatus[]> = {
   interview: ["reviewing", "hired", "rejected"],
   rejected: [],
   hired: [],
+  withdrawn: [],
 };
+
+export const PRE_WITHDRAWAL_APPLICATION_STATUSES = APPLICATION_STATUSES.filter(
+  (status) => status !== "withdrawn",
+);
+
+export function isCandidateApplicationWithdrawalEnabled(
+  value = process.env.CANDIDATE_APPLICATION_WITHDRAWAL_ENABLED,
+) {
+  return value === "true";
+}
+
+export function getEnabledApplicationStatuses(
+  withdrawalEnabled = isCandidateApplicationWithdrawalEnabled(),
+): readonly ApplicationStatus[] {
+  return withdrawalEnabled ? APPLICATION_STATUSES : PRE_WITHDRAWAL_APPLICATION_STATUSES;
+}
 
 export const DEFAULT_APPLICATION_STATUS: ApplicationStatus = "received";
 export const APPLICATION_TRANSITION_BROWSER_FIELDS = ["jobId", "applicationId", "targetStatus"] as const;
@@ -34,7 +53,9 @@ export function isApplicationStatus(value: unknown): value is ApplicationStatus 
 
 export function parseApplicationStatusFilter(value: string | string[] | undefined): ApplicationStatusFilter {
   const raw = Array.isArray(value) ? value[0] : value;
-  return raw === "all" || isApplicationStatus(raw) ? raw : "all";
+  return raw === "all" || (getEnabledApplicationStatuses() as readonly ApplicationStatus[]).includes(raw as ApplicationStatus)
+    ? raw as ApplicationStatusFilter
+    : "all";
 }
 
 export function getAllowedApplicationTransitions(status: ApplicationStatus) {

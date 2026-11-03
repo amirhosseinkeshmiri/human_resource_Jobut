@@ -7,6 +7,8 @@ import {
   canCompanyTransitionApplication,
   canTransitionApplicationStatus,
   getAllowedApplicationTransitions,
+  getEnabledApplicationStatuses,
+  isCandidateApplicationWithdrawalEnabled,
   isApplicationStatus,
   isTerminalApplicationStatus,
   matchesExpectedApplicationStatus,
@@ -18,7 +20,7 @@ test("new Applications start received and arbitrary statuses are rejected", () =
   assert.equal(DEFAULT_APPLICATION_STATUS, "received");
   assert.equal(isApplicationStatus("received"), true);
   assert.equal(isApplicationStatus("shortlisted"), false);
-  assert.deepEqual(APPLICATION_STATUSES, ["received", "reviewing", "interview", "rejected", "hired"]);
+  assert.deepEqual(APPLICATION_STATUSES, ["received", "reviewing", "interview", "rejected", "hired", "withdrawn"]);
 });
 
 test("approved forward, rejection, and correction transitions are allowed", () => {
@@ -36,15 +38,25 @@ test("approved forward, rejection, and correction transitions are allowed", () =
   }
 });
 
-test("hired and rejected are terminal and invalid transitions are blocked", () => {
+test("hired, rejected, and withdrawn are terminal and invalid transitions are blocked", () => {
   assert.equal(isTerminalApplicationStatus("hired"), true);
   assert.equal(isTerminalApplicationStatus("rejected"), true);
+  assert.equal(isTerminalApplicationStatus("withdrawn"), true);
   assert.deepEqual(getAllowedApplicationTransitions("hired"), []);
   assert.deepEqual(getAllowedApplicationTransitions("rejected"), []);
+  assert.deepEqual(getAllowedApplicationTransitions("withdrawn"), []);
   assert.equal(canTransitionApplicationStatus("rejected", "hired"), false);
   assert.equal(canTransitionApplicationStatus("hired", "reviewing"), false);
   assert.equal(resolveApplicationTransition("received", "interview"), "invalid");
   assert.equal(resolveApplicationTransition("reviewing", "reviewing"), "noop");
+});
+
+test("withdrawn status is hidden until the exact server feature flag is enabled", () => {
+  assert.equal(isCandidateApplicationWithdrawalEnabled(undefined), false);
+  assert.equal(isCandidateApplicationWithdrawalEnabled("TRUE"), false);
+  assert.equal(isCandidateApplicationWithdrawalEnabled("true"), true);
+  assert.equal(getEnabledApplicationStatuses(false).includes("withdrawn"), false);
+  assert.equal(getEnabledApplicationStatuses(true).includes("withdrawn"), true);
 });
 
 test("ownership requires authenticated Company, requested Job, and Application Job alignment", () => {
@@ -63,7 +75,8 @@ test("conditional updates reject a stale expected status", () => {
 test("status filters normalize invalid input and preserve every approved filter", () => {
   assert.equal(parseApplicationStatusFilter(undefined), "all");
   assert.equal(parseApplicationStatusFilter("all"), "all");
-  for (const status of APPLICATION_STATUSES) assert.equal(parseApplicationStatusFilter(status), status);
+  for (const status of getEnabledApplicationStatuses(false)) assert.equal(parseApplicationStatusFilter(status), status);
+  assert.equal(parseApplicationStatusFilter("withdrawn"), "all");
   assert.equal(parseApplicationStatusFilter("unknown"), "all");
   assert.equal(parseApplicationStatusFilter(["reviewing", "received"]), "reviewing");
 });

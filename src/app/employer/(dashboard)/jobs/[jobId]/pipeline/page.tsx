@@ -51,7 +51,7 @@ export default async function EmployerJobPipelinePage({ params }: PageProps) {
       ) : null}
 
       <div className="mt-6 overflow-x-visible xl:overflow-x-auto">
-        <div className="grid gap-4 md:grid-cols-2 xl:min-w-[90rem] xl:grid-cols-5">
+        <div className="grid gap-4 md:grid-cols-2 xl:min-w-[90rem] xl:grid-cols-6">
           {columns.map((column) => (
             <section key={column.status} aria-labelledby={`pipeline-${column.status}`} className="rounded-lg border border-ui-border bg-surface-elevated/60 p-3">
               <header className="flex items-center justify-between gap-3 border-b border-ui-border pb-3">

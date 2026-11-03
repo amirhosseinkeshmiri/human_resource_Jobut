@@ -2,17 +2,21 @@ import "server-only";
 import { and, asc, count, desc, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
+  applicationResumeSnapshotCredentials,
   applicationResumeSnapshotEducations,
   applicationResumeSnapshotExperiences,
   applicationResumeSnapshotLanguages,
   applicationResumeSnapshots,
   companies,
   jobApplications,
+  jobApplicationStatusHistory,
   jobPosts,
 } from "@/db/schema";
+import { APPLICATION_STATUS_HISTORY_LIMIT } from "./status-history-policy";
 import { publicJobConditions } from "@/jobs/public-queries";
 import { getCandidateResume } from "@/resume/queries";
 import { isStoredResumeComplete } from "@/resume/policy";
+import { isCandidateCredentialsEnabled } from "@/candidate-credentials/feature";
 
 export async function getCandidateApplyState(candidateAccountId: string, jobPostId: string) {
   const [resume, existing] = await Promise.all([
@@ -60,6 +64,7 @@ export async function getCandidateApplicationResumeSnapshot(
   const [application] = await db.select({
     applicationId: jobApplications.id,
     applicationCreatedAt: jobApplications.createdAt,
+    applicationStatus: jobApplications.status,
     jobTitle: jobPosts.title,
     companyName: companies.name,
     snapshotApplicationId: applicationResumeSnapshots.jobApplicationId,
@@ -80,12 +85,24 @@ export async function getCandidateApplicationResumeSnapshot(
     .limit(1);
   if (!application) return null;
 
-  const [experiences, educations, languages] = await Promise.all([
+  const [experiences, educations, languages, credentials, statusHistory] = await Promise.all([
     db.select({ jobTitle: applicationResumeSnapshotExperiences.jobTitle, companyName: applicationResumeSnapshotExperiences.companyName, startDate: applicationResumeSnapshotExperiences.startDate, endDate: applicationResumeSnapshotExperiences.endDate, isCurrent: applicationResumeSnapshotExperiences.isCurrent, description: applicationResumeSnapshotExperiences.description }).from(applicationResumeSnapshotExperiences).where(eq(applicationResumeSnapshotExperiences.jobApplicationId, applicationId)).orderBy(asc(applicationResumeSnapshotExperiences.sortOrder)),
     db.select({ fieldOfStudy: applicationResumeSnapshotEducations.fieldOfStudy, institutionName: applicationResumeSnapshotEducations.institutionName, degree: applicationResumeSnapshotEducations.degree, startDate: applicationResumeSnapshotEducations.startDate, endDate: applicationResumeSnapshotEducations.endDate, isCurrent: applicationResumeSnapshotEducations.isCurrent }).from(applicationResumeSnapshotEducations).where(eq(applicationResumeSnapshotEducations.jobApplicationId, applicationId)).orderBy(asc(applicationResumeSnapshotEducations.sortOrder)),
     db.select({ name: applicationResumeSnapshotLanguages.name, proficiency: applicationResumeSnapshotLanguages.proficiency }).from(applicationResumeSnapshotLanguages).where(eq(applicationResumeSnapshotLanguages.jobApplicationId, applicationId)).orderBy(asc(applicationResumeSnapshotLanguages.sortOrder)),
+    isCandidateCredentialsEnabled()
+      ? db.select().from(applicationResumeSnapshotCredentials).where(eq(applicationResumeSnapshotCredentials.jobApplicationId, applicationId)).orderBy(asc(applicationResumeSnapshotCredentials.sortOrder))
+      : Promise.resolve([]),
+    db.select({
+      id: jobApplicationStatusHistory.id,
+      fromStatus: jobApplicationStatusHistory.fromStatus,
+      toStatus: jobApplicationStatusHistory.toStatus,
+      changedAt: jobApplicationStatusHistory.changedAt,
+    }).from(jobApplicationStatusHistory)
+      .where(eq(jobApplicationStatusHistory.jobApplicationId, applicationId))
+      .orderBy(asc(jobApplicationStatusHistory.changedAt), asc(jobApplicationStatusHistory.id))
+      .limit(APPLICATION_STATUS_HISTORY_LIMIT),
   ]);
-  return { ...application, snapshotAvailable: application.snapshotApplicationId !== null, experiences, educations, languages };
+  return { ...application, snapshotAvailable: application.snapshotApplicationId !== null, experiences, educations, languages, credentials, statusHistory };
 }
 
 export async function countCandidateApplications(candidateAccountId: string) {

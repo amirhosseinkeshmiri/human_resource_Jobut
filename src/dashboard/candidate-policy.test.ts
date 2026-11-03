@@ -67,12 +67,12 @@ test("selected preferences are summarized by factual counts", () => {
 
 test("zero Applications and multiple ATS statuses count accurately", () => {
   assert.deepEqual(countCandidateApplicationStatuses([]), {
-    total: 0, received: 0, reviewing: 0, interview: 0, rejected: 0, hired: 0,
+    total: 0, received: 0, reviewing: 0, interview: 0, rejected: 0, hired: 0, withdrawn: 0,
   });
   assert.deepEqual(countCandidateApplicationStatuses([
-    "received", "received", "reviewing", "interview", "rejected", "hired",
+    "received", "received", "reviewing", "interview", "rejected", "hired", "withdrawn",
   ]), {
-    total: 6, received: 2, reviewing: 1, interview: 1, rejected: 1, hired: 1,
+    total: 7, received: 2, reviewing: 1, interview: 1, rejected: 1, hired: 1, withdrawn: 1,
   });
 });
 

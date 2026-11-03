@@ -11,6 +11,7 @@ import {
   parsePublicJobFilters,
   PUBLIC_JOB_LOCATION_MAX_LENGTH,
   PUBLIC_JOB_QUERY_MAX_LENGTH,
+  PUBLIC_JOB_SALARY_MAX,
   PUBLIC_JOBS_CLEAR_URL,
   type PublicJobSearchParams,
 } from "@/jobs/public-search";
@@ -23,6 +24,9 @@ import {
   workplaceTypes,
 } from "@/jobs/validation";
 import { PUBLIC_JOBS_LABEL } from "@/jobs/public-copy";
+import { getCurrentCandidate } from "@/candidate-auth/session";
+import { isCandidateSavedJobsEnabled } from "@/saved-jobs/policy";
+import { getCandidateSavedJobIds } from "@/saved-jobs/queries";
 
 export const dynamic = "force-dynamic";
 
@@ -40,7 +44,9 @@ const numberFormatter = new Intl.NumberFormat("fa-IR");
 export default async function PublicJobsPage({ searchParams }: PageProps) {
   const query = await searchParams;
   const filters = parsePublicJobFilters(query);
-  const { jobs, total, page, pageCount } = await getPublicJobs(filters);
+  const [{ jobs, total, page, pageCount }, candidate] = await Promise.all([getPublicJobs(filters), getCurrentCandidate()]);
+  const savingEnabled = Boolean(candidate) && isCandidateSavedJobsEnabled();
+  const savedJobIds = savingEnabled && candidate ? await getCandidateSavedJobIds(candidate.id, jobs.map((job) => job.id)) : new Set<string>();
   const filtered = hasPublicJobFilters(filters);
   const applicationOutcome = Array.isArray(query.application) ? query.application[0] : query.application;
 
@@ -85,11 +91,30 @@ export default async function PublicJobsPage({ searchParams }: PageProps) {
                   {seniorityLevels.map((value) => <option key={value} value={value}>{seniorityLevelLabels[value]}</option>)}
                 </Select>
               </FormField>
-              <div className="flex flex-col gap-2 sm:flex-row lg:col-span-4">
+              <FormField id="job-search-salary-type" label="نوع حقوق">
+                <Select name="salaryType" defaultValue={filters.salaryType ?? ""}>
+                  <option value="">همه</option>
+                  <option value="fixed">بازه حقوق مشخص</option>
+                  <option value="negotiable">حقوق توافقی</option>
+                </Select>
+              </FormField>
+              <FormField id="job-search-min-salary" label="حداقل حقوق موردنظر" hint="تومان؛ آگهی‌های توافقی در فیلتر عددی نمایش داده نمی‌شوند.">
+                <Input name="minSalary" type="number" inputMode="numeric" min={0} max={PUBLIC_JOB_SALARY_MAX} step={1} defaultValue={filters.minSalary ?? ""} placeholder="مثلاً ۲۰۰۰۰۰۰۰" dir="ltr" />
+              </FormField>
+              <FormField id="job-search-sort" label="مرتب‌سازی">
+                <Select name="sort" defaultValue={filters.sort}>
+                  <option value="newest">جدیدترین</option>
+                  <option value="oldest">قدیمی‌ترین</option>
+                  <option value="salary_asc">حقوق از کم به زیاد</option>
+                  <option value="salary_desc">حقوق از زیاد به کم</option>
+                </Select>
+              </FormField>
+              <div className="flex flex-col gap-2 sm:flex-row lg:col-span-2">
                 <Button type="submit" className="w-full sm:w-auto">جست‌وجوی فرصت‌ها</Button>
                 {filtered ? <Link href={PUBLIC_JOBS_CLEAR_URL} className={buttonClassNames({ variant: "secondary", className: "w-full sm:w-auto" })}>پاک کردن فیلترها</Link> : null}
               </div>
             </form>
+            <p className="text-helper mt-4">فیلتر حداقل حقوق، آگهی‌هایی را نشان می‌دهد که سقف بازه آن‌ها حداقل به مبلغ انتخابی می‌رسد. مرتب‌سازی حقوق بر اساس ابتدای بازه و سپس انتهای بازه است و آگهی‌های توافقی در انتهای فهرست قرار می‌گیرند.</p>
           </Card>
 
           <div className="mt-7 flex flex-wrap items-center justify-between gap-3">
@@ -99,7 +124,7 @@ export default async function PublicJobsPage({ searchParams }: PageProps) {
 
           {jobs.length > 0 ? (
             <section aria-label="فهرست فرصت‌های شغلی" className="mt-5 grid gap-4 md:grid-cols-2">
-              {jobs.map((job) => <PublicJobCard key={job.id} job={job} />)}
+              {jobs.map((job) => <PublicJobCard key={job.id} job={job} savingEnabled={savingEnabled} saved={savedJobIds.has(job.id)} />)}
             </section>
           ) : (
             <Card className="mt-5 text-center shadow-none">

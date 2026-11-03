@@ -5,6 +5,29 @@ import { randomUUID } from "node:crypto";
 
 const CALLBACK_PATH = "/api/payments/sep/callback";
 const COMPANY_MEDIA_DIRECTORY = "company-media";
+const CANDIDATE_PROFILE_PHOTO_DIRECTORY = "candidate-profile-photos";
+const CANDIDATE_CREDENTIAL_DIRECTORY = "candidate-credentials";
+
+function verifyStorageSubdirectory(realStorageDirectory, subdirectory) {
+  const directory = path.join(realStorageDirectory, subdirectory);
+  mkdirSync(directory, { recursive: true, mode: 0o750 });
+  const directoryInfo = lstatSync(directory);
+  if (!directoryInfo.isDirectory() || directoryInfo.isSymbolicLink()) {
+    throw new Error(`UPLOAD_STORAGE_DIR/${subdirectory} must be a real directory, not a symlink.`);
+  }
+  if (realpathSync(directory) !== directory) {
+    throw new Error(`UPLOAD_STORAGE_DIR/${subdirectory} must remain inside the persistent mount.`);
+  }
+  accessSync(directory, constants.R_OK | constants.W_OK);
+  const probePath = path.join(directory, `.jobut-write-probe-${randomUUID()}`);
+  let probeDescriptor;
+  try {
+    probeDescriptor = openSync(probePath, constants.O_CREAT | constants.O_EXCL | constants.O_WRONLY | constants.O_NOFOLLOW, 0o600);
+  } finally {
+    if (probeDescriptor !== undefined) closeSync(probeDescriptor);
+    try { unlinkSync(probePath); } catch (error) { if (error?.code !== "ENOENT") throw error; }
+  }
+}
 
 function readHttpsUrl(environment, name) {
   const rawValue = environment[name];
@@ -57,23 +80,16 @@ export function verifyProductionRuntime(environment = process.env) {
   if (realStorageDirectory !== resolvedStorageDirectory) {
     throw new Error("UPLOAD_STORAGE_DIR must not be a symbolic-link alias.");
   }
-  const companyMediaDirectory = path.join(realStorageDirectory, COMPANY_MEDIA_DIRECTORY);
-  mkdirSync(companyMediaDirectory, { recursive: true, mode: 0o750 });
-  const mediaDirectoryInfo = lstatSync(companyMediaDirectory);
-  if (!mediaDirectoryInfo.isDirectory() || mediaDirectoryInfo.isSymbolicLink()) {
-    throw new Error("UPLOAD_STORAGE_DIR/company-media must be a real directory, not a symlink.");
+  verifyStorageSubdirectory(realStorageDirectory, COMPANY_MEDIA_DIRECTORY);
+  if (environment.CANDIDATE_PROFILE_PHOTO_ENABLED === "true") {
+    verifyStorageSubdirectory(realStorageDirectory, CANDIDATE_PROFILE_PHOTO_DIRECTORY);
+  } else if (environment.CANDIDATE_PROFILE_PHOTO_ENABLED && environment.CANDIDATE_PROFILE_PHOTO_ENABLED !== "false") {
+    throw new Error("CANDIDATE_PROFILE_PHOTO_ENABLED must be exactly true or false when configured.");
   }
-  if (realpathSync(companyMediaDirectory) !== companyMediaDirectory) {
-    throw new Error("UPLOAD_STORAGE_DIR/company-media must remain inside the persistent mount.");
-  }
-  accessSync(companyMediaDirectory, constants.R_OK | constants.W_OK);
-  const probePath = path.join(companyMediaDirectory, `.jobut-write-probe-${randomUUID()}`);
-  let probeDescriptor;
-  try {
-    probeDescriptor = openSync(probePath, constants.O_CREAT | constants.O_EXCL | constants.O_WRONLY | constants.O_NOFOLLOW, 0o600);
-  } finally {
-    if (probeDescriptor !== undefined) closeSync(probeDescriptor);
-    try { unlinkSync(probePath); } catch (error) { if (error?.code !== "ENOENT") throw error; }
+  if (environment.CANDIDATE_CREDENTIALS_ENABLED === "true") {
+    verifyStorageSubdirectory(realStorageDirectory, CANDIDATE_CREDENTIAL_DIRECTORY);
+  } else if (environment.CANDIDATE_CREDENTIALS_ENABLED && environment.CANDIDATE_CREDENTIALS_ENABLED !== "false") {
+    throw new Error("CANDIDATE_CREDENTIALS_ENABLED must be exactly true or false when configured.");
   }
   const storageStats = statfsSync(realStorageDirectory);
   const availableBytes = storageStats.bavail * storageStats.bsize;
@@ -151,7 +167,10 @@ if (invokedDirectly) {
   try {
     verifyProductionRuntime();
     const storageStats = statfsSync(realpathSync(process.env.UPLOAD_STORAGE_DIR));
-    console.log(JSON.stringify({ event: "production_runtime_verified", uploadStorage: { available: true, writable: true, directory: "company-media", availableBytes: storageStats.bavail * storageStats.bsize, totalBytes: storageStats.blocks * storageStats.bsize } }));
+    const directories = ["company-media"];
+    if (process.env.CANDIDATE_PROFILE_PHOTO_ENABLED === "true") directories.push("candidate-profile-photos");
+    if (process.env.CANDIDATE_CREDENTIALS_ENABLED === "true") directories.push("candidate-credentials");
+    console.log(JSON.stringify({ event: "production_runtime_verified", uploadStorage: { available: true, writable: true, directories, availableBytes: storageStats.bavail * storageStats.bsize, totalBytes: storageStats.blocks * storageStats.bsize } }));
   } catch (error) {
     console.error(JSON.stringify({ event: "production_runtime_verification_failed", code: error?.code ?? "INVALID_CONFIGURATION", message: error instanceof Error ? error.message : "Production runtime configuration is invalid." }));
     process.exitCode = 1;

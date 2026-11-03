@@ -1,6 +1,7 @@
 import {
   APPLICATION_STATUSES,
   applicationStatusLabels,
+  getEnabledApplicationStatuses,
   type ApplicationStatus,
 } from "@/applications/status-policy";
 
@@ -43,7 +44,7 @@ export function buildPipelineColumns(
   applications: PipelineApplication[],
   counts: PipelineStatusCounts,
 ) {
-  return APPLICATION_STATUSES.map((status) => ({
+  return getEnabledApplicationStatuses().map((status) => ({
     status,
     label: applicationStatusLabels[status],
     count: counts[status],

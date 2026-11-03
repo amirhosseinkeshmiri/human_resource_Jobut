@@ -365,6 +365,58 @@ export const candidateAccounts = pgTable(
   ],
 );
 
+export const candidateProfilePhotos = pgTable(
+  "candidate_profile_photos",
+  {
+    candidateAccountId: uuid("candidate_account_id")
+      .primaryKey()
+      .references(() => candidateAccounts.id, { onDelete: "cascade" }),
+    storageKey: varchar("storage_key", { length: 80 }).notNull().unique(),
+    contentType: varchar("content_type", { length: 32 }).default("image/webp").notNull(),
+    byteSize: integer("byte_size").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    check(
+      "candidate_profile_photos_storage_key_check",
+      sql`${table.storageKey} ~ '^photo-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\\.webp$'`,
+    ),
+    check(
+      "candidate_profile_photos_content_type_check",
+      sql`${table.contentType} = 'image/webp'`,
+    ),
+    check(
+      "candidate_profile_photos_byte_size_check",
+      sql`${table.byteSize} > 0 and ${table.byteSize} <= 1048576`,
+    ),
+  ],
+);
+
+export const candidateSavedJobs = pgTable(
+  "candidate_saved_jobs",
+  {
+    candidateAccountId: uuid("candidate_account_id")
+      .notNull()
+      .references(() => candidateAccounts.id, { onDelete: "cascade" }),
+    jobPostId: uuid("job_post_id")
+      .notNull()
+      .references(() => jobPosts.id, { onDelete: "cascade" }),
+    savedAt: timestamp("saved_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    primaryKey({
+      name: "candidate_saved_jobs_pkey",
+      columns: [table.candidateAccountId, table.jobPostId],
+    }),
+    index("candidate_saved_jobs_candidate_time_idx").on(
+      table.candidateAccountId,
+      table.savedAt,
+    ),
+    index("candidate_saved_jobs_job_post_idx").on(table.jobPostId),
+  ],
+);
+
 export const candidateLegalAcceptances = pgTable(
   "candidate_legal_acceptances",
   {
@@ -506,6 +558,12 @@ export const resumeLanguageProficiency = pgEnum("resume_language_proficiency", [
   "native",
 ]);
 
+export const candidateCredentialType = pgEnum("candidate_credential_type", [
+  "certificate",
+  "training_course",
+  "supporting_credential",
+]);
+
 export const candidateResumes = pgTable(
   "candidate_resumes",
   {
@@ -524,6 +582,52 @@ export const candidateResumes = pgTable(
     ...timestamps,
   },
   (table) => [unique("candidate_resumes_candidate_account_unique").on(table.candidateAccountId)],
+);
+
+export const candidateCredentials = pgTable(
+  "candidate_credentials",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    candidateAccountId: uuid("candidate_account_id")
+      .notNull()
+      .references(() => candidateAccounts.id, { onDelete: "cascade" }),
+    recordType: candidateCredentialType("record_type").notNull(),
+    title: varchar("title", { length: 200 }).notNull(),
+    issuer: varchar("issuer", { length: 200 }).notNull(),
+    issueDate: date("issue_date"),
+    expirationDate: date("expiration_date"),
+    credentialId: varchar("credential_id", { length: 200 }),
+    verificationUrl: text("verification_url"),
+    description: text("description"),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("candidate_credentials_candidate_updated_idx").on(table.candidateAccountId, table.updatedAt),
+    check(
+      "candidate_credentials_dates_check",
+      sql`${table.issueDate} is null or ${table.expirationDate} is null or ${table.expirationDate} >= ${table.issueDate}`,
+    ),
+  ],
+);
+
+export const candidateCredentialDocuments = pgTable(
+  "candidate_credential_documents",
+  {
+    credentialId: uuid("credential_id")
+      .primaryKey()
+      .references(() => candidateCredentials.id, { onDelete: "cascade" }),
+    storageKey: varchar("storage_key", { length: 88 }).notNull().unique(),
+    contentType: varchar("content_type", { length: 32 }).default("image/webp").notNull(),
+    byteSize: integer("byte_size").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    check("candidate_credential_documents_storage_key_check", sql`${table.storageKey} ~ '^credential-[0-9a-f-]{36}\\.webp$'`),
+    check("candidate_credential_documents_content_type_check", sql`${table.contentType} = 'image/webp'`),
+    check("candidate_credential_documents_byte_size_check", sql`${table.byteSize} > 0 and ${table.byteSize} <= 2097152`),
+  ],
 );
 
 export const resumeExperiences = pgTable(
@@ -592,6 +696,7 @@ export const applicationStatus = pgEnum("application_status", [
   "interview",
   "rejected",
   "hired",
+  "withdrawn",
 ]);
 
 export const applicationMessageSenderRole = pgEnum("application_message_sender_role", [
@@ -730,6 +835,29 @@ export const applicationResumeSnapshotLanguages = pgTable(
       table.jobApplicationId,
     ),
     check("application_resume_snapshot_languages_sort_check", sql`${table.sortOrder} >= 0`),
+  ],
+);
+
+export const applicationResumeSnapshotCredentials = pgTable(
+  "application_resume_snapshot_credentials",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    jobApplicationId: uuid("job_application_id").notNull().references(() => applicationResumeSnapshots.jobApplicationId, { onDelete: "cascade" }),
+    recordType: candidateCredentialType("record_type").notNull(),
+    title: varchar("title", { length: 200 }).notNull(),
+    issuer: varchar("issuer", { length: 200 }).notNull(),
+    issueDate: date("issue_date"),
+    expirationDate: date("expiration_date"),
+    credentialId: varchar("credential_id", { length: 200 }),
+    verificationUrl: text("verification_url"),
+    description: text("description"),
+    sortOrder: integer("sort_order").notNull(),
+  },
+  (table) => [
+    unique("application_resume_snapshot_credentials_sort_unique").on(table.jobApplicationId, table.sortOrder),
+    index("application_resume_snapshot_credentials_application_idx").on(table.jobApplicationId),
+    check("application_resume_snapshot_credentials_sort_check", sql`${table.sortOrder} >= 0`),
+    check("application_resume_snapshot_credentials_dates_check", sql`${table.issueDate} is null or ${table.expirationDate} is null or ${table.expirationDate} >= ${table.issueDate}`),
   ],
 );
 
@@ -878,7 +1006,36 @@ export const candidateAccountRelations = relations(candidateAccounts, ({ one, ma
   sessions: many(candidateSessions),
   resume: one(candidateResumes),
   jobPreferences: one(candidateJobPreferences),
+  profilePhoto: one(candidateProfilePhotos),
   applications: many(jobApplications),
+  savedJobs: many(candidateSavedJobs),
+  credentials: many(candidateCredentials),
+}));
+
+export const candidateCredentialRelations = relations(candidateCredentials, ({ one }) => ({
+  candidateAccount: one(candidateAccounts, {
+    fields: [candidateCredentials.candidateAccountId],
+    references: [candidateAccounts.id],
+  }),
+  document: one(candidateCredentialDocuments),
+}));
+
+export const candidateCredentialDocumentRelations = relations(candidateCredentialDocuments, ({ one }) => ({
+  credential: one(candidateCredentials, {
+    fields: [candidateCredentialDocuments.credentialId],
+    references: [candidateCredentials.id],
+  }),
+}));
+
+export const candidateSavedJobRelations = relations(candidateSavedJobs, ({ one }) => ({
+  candidateAccount: one(candidateAccounts, {
+    fields: [candidateSavedJobs.candidateAccountId],
+    references: [candidateAccounts.id],
+  }),
+  jobPost: one(jobPosts, {
+    fields: [candidateSavedJobs.jobPostId],
+    references: [jobPosts.id],
+  }),
 }));
 
 export const candidateJobPreferenceRelations = relations(candidateJobPreferences, ({ one }) => ({
@@ -1162,6 +1319,7 @@ export const jobPostRelations = relations(jobPosts, ({ one, many }) => ({
     references: [companies.id],
   }),
   applications: many(jobApplications),
+  savedByCandidates: many(candidateSavedJobs),
 }));
 
 export const jobApplicationRelations = relations(jobApplications, ({ one }) => ({

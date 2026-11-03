@@ -1,5 +1,6 @@
 import { employmentTypeLabels, seniorityLevelLabels, workplaceTypeLabels } from "@/jobs/validation";
 import { JobOpportunityCard } from "./job-opportunity-card";
+import { SaveJobControl } from "./save-job-control";
 
 interface PublicJobCardProps {
   job: {
@@ -18,8 +19,10 @@ interface PublicJobCardProps {
     companyLogoUrl: string | null;
     industryName: string;
   };
+  saved?: boolean;
+  savingEnabled?: boolean;
 }
 
-export function PublicJobCard({ job }: PublicJobCardProps) {
-  return <JobOpportunityCard job={job} skills={job.requiredSkills} />;
+export function PublicJobCard({ job, saved = false, savingEnabled = false }: PublicJobCardProps) {
+  return <JobOpportunityCard job={job} skills={job.requiredSkills} footerAction={savingEnabled ? <SaveJobControl jobPostId={job.id} initiallySaved={saved} /> : null} />;
 }

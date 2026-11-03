@@ -20,6 +20,7 @@ test("only active recruitment applications can receive new messages", () => {
   assert.equal(canSendApplicationMessage(base), true);
   assert.equal(canSendApplicationMessage({ ...base, applicationStatus: "rejected" }), false);
   assert.equal(canSendApplicationMessage({ ...base, applicationStatus: "hired" }), false);
+  assert.equal(canSendApplicationMessage({ ...base, applicationStatus: "withdrawn" }), false);
   assert.equal(canSendApplicationMessage({ ...base, jobStatus: "closed" }), false);
 });
 

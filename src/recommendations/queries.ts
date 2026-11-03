@@ -10,11 +10,12 @@ import {
   jobPosts,
 } from "@/db/schema";
 import { publicJobConditions } from "@/jobs/public-queries";
-import { RECOMMENDATION_LIMIT } from "./policy";
-
-function normalizeText(value: string) {
-  return value.trim().replace(/\s+/g, " ").toLocaleLowerCase("fa-IR");
-}
+import {
+  deduplicateDisplaySkills,
+  normalizeRecommendationText,
+  RECOMMENDATION_LIMIT,
+  RECOMMENDATION_SCORE_WEIGHTS,
+} from "./policy";
 
 function sqlList(values: readonly string[]) {
   return sql.join(values.map((value) => sql`${value}`), sql`, `);
@@ -22,6 +23,10 @@ function sqlList(values: readonly string[]) {
 
 function enumMatch(column: SQLWrapper, values: readonly string[]): SQL<boolean> {
   return values.length ? sql<boolean>`${column} in (${sqlList(values)})` : sql<boolean>`false`;
+}
+
+function normalizedSqlText(value: SQLWrapper) {
+  return sql<string>`lower(btrim(regexp_replace(regexp_replace(translate(normalize(${value}, NFKC), 'يىك', 'ییک'), '[ـ-ٰٟ]', '', 'g'), '[[:space:]‌‍]+', ' ', 'g')))`;
 }
 
 export type CandidateRecommendationProfile = NonNullable<Awaited<ReturnType<typeof getCandidateRecommendationProfile>>>;
@@ -44,21 +49,27 @@ async function queryRecommendations(
   now: Date,
   limit: number,
 ) {
-  const normalizedSkills = [...new Set(profile.skills.map(normalizeText))];
-  const normalizedLocations = [...new Set(profile.preferredLocations.map(normalizeText))];
+  const normalizedSkills = deduplicateDisplaySkills(profile.skills).map(normalizeRecommendationText);
+  const normalizedLocations = deduplicateDisplaySkills(profile.preferredLocations).map(normalizeRecommendationText);
   const skillValues = sqlList(normalizedSkills);
   const skillCount = sql<number>`(
-    select count(*)::int
+    select count(distinct ${normalizedSqlText(sql`required_skill.value`)})::int
     from unnest(${jobPosts.requiredSkills}) as required_skill(value)
-    where lower(btrim(required_skill.value)) in (${skillValues})
+    where ${normalizedSqlText(sql`required_skill.value`)} in (${skillValues})
   )`;
   const matchedSkills = sql<string[]>`coalesce((
-    select array_agg(required_skill.value order by required_skill.ordinality)
-    from unnest(${jobPosts.requiredSkills}) with ordinality as required_skill(value, ordinality)
-    where lower(btrim(required_skill.value)) in (${skillValues})
+    select array_agg(matches.display_value order by matches.first_ordinality)
+    from (
+      select
+        (array_agg(required_skill.value order by required_skill.ordinality))[1] as display_value,
+        min(required_skill.ordinality) as first_ordinality
+      from unnest(${jobPosts.requiredSkills}) with ordinality as required_skill(value, ordinality)
+      where ${normalizedSqlText(sql`required_skill.value`)} in (${skillValues})
+      group by ${normalizedSqlText(sql`required_skill.value`)}
+    ) matches
   ), '{}'::text[])`;
   const locationMatched = normalizedLocations.length
-    ? sql<boolean>`lower(btrim(${jobPosts.location})) in (${sqlList(normalizedLocations)})`
+    ? sql<boolean>`${normalizedSqlText(jobPosts.location)} in (${sqlList(normalizedLocations)})`
     : sql<boolean>`false`;
   const workplaceMatched = enumMatch(
     jobPosts.workplaceType,
@@ -73,7 +84,7 @@ async function queryRecommendations(
     profile.preferredSeniorityLevels,
   );
   const resumeCityMatched = normalizedLocations.length === 0
-    ? sql<boolean>`lower(btrim(${jobPosts.location})) = ${normalizeText(profile.city)}`
+    ? sql<boolean>`${normalizedSqlText(jobPosts.location)} = ${normalizeRecommendationText(profile.city)}`
     : sql<boolean>`false`;
   const explicitPreferenceMatches = sql<number>`(
     (case when ${locationMatched} then 1 else 0 end)
@@ -82,12 +93,12 @@ async function queryRecommendations(
     + (case when ${seniorityMatched} then 1 else 0 end)
   )`;
   const score = sql<number>`(
-    (${skillCount} * 10)
-    + (case when ${locationMatched} then 4 else 0 end)
-    + (case when ${workplaceMatched} then 3 else 0 end)
-    + (case when ${employmentMatched} then 3 else 0 end)
-    + (case when ${seniorityMatched} then 3 else 0 end)
-    + (case when ${resumeCityMatched} then 2 else 0 end)
+    (${skillCount} * ${RECOMMENDATION_SCORE_WEIGHTS.skill})
+    + (case when ${locationMatched} then ${RECOMMENDATION_SCORE_WEIGHTS.preferredLocation} else 0 end)
+    + (case when ${workplaceMatched} then ${RECOMMENDATION_SCORE_WEIGHTS.preferredWorkplace} else 0 end)
+    + (case when ${employmentMatched} then ${RECOMMENDATION_SCORE_WEIGHTS.preferredEmployment} else 0 end)
+    + (case when ${seniorityMatched} then ${RECOMMENDATION_SCORE_WEIGHTS.preferredSeniority} else 0 end)
+    + (case when ${resumeCityMatched} then ${RECOMMENDATION_SCORE_WEIGHTS.resumeCityFallback} else 0 end)
   )`;
   const candidateAlreadyApplied = db.select({ id: jobApplications.id })
     .from(jobApplications)

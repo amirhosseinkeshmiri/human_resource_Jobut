@@ -38,8 +38,8 @@ test("HSTS is production-only and excludes unverified preload and subdomains", (
   assert.equal(HSTS_HEADER.value.includes("preload"), false);
 });
 
-test("all authenticated, login, and payment routes receive private no-store policy", () => {
-  assert.deepEqual(PRIVATE_ROUTE_PATTERNS, ["/admin/:path*", "/candidate/:path*", "/employer/:path*", "/login/:path*", "/api/payments/:path*"]);
+test("all authenticated, login, payment, and Candidate API routes receive private no-store policy", () => {
+  assert.deepEqual(PRIVATE_ROUTE_PATTERNS, ["/admin/:path*", "/candidate/:path*", "/employer/:path*", "/login/:path*", "/api/payments/:path*", "/api/candidate/:path*"]);
   const values = Object.fromEntries(PRIVATE_CACHE_HEADERS.map((header) => [header.key, header.value]));
   assert.match(values["Cache-Control"], /private/);
   assert.match(values["Cache-Control"], /no-store/);

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { APPLICATION_STATUSES } from "@/applications/status-policy";
+import { PRE_WITHDRAWAL_APPLICATION_STATUSES } from "@/applications/status-policy";
 import { canReviewHistoricalJob } from "./policy";
 import {
   EMPLOYER_PIPELINE_CAPABILITIES,
@@ -30,8 +30,21 @@ test("Employer pipeline access requires the owned requested Job", () => {
 
 test("pipeline always represents exactly all five approved statuses", () => {
   const columns = buildPipelineColumns([], emptyPipelineStatusCounts());
-  assert.deepEqual(columns.map((column) => column.status), APPLICATION_STATUSES);
+  assert.deepEqual(columns.map((column) => column.status), PRE_WITHDRAWAL_APPLICATION_STATUSES);
   assert.deepEqual(columns.map((column) => column.label), ["دریافت‌شده", "در حال بررسی", "مصاحبه", "رد شده", "استخدام شده"]);
+});
+
+test("withdrawn applications appear as a distinct terminal column only after activation", () => {
+  const previous = process.env.CANDIDATE_APPLICATION_WITHDRAWAL_ENABLED;
+  process.env.CANDIDATE_APPLICATION_WITHDRAWAL_ENABLED = "true";
+  try {
+    const columns = buildPipelineColumns([], emptyPipelineStatusCounts());
+    assert.equal(columns.at(-1)?.status, "withdrawn");
+    assert.equal(columns.at(-1)?.label, "انصراف داده‌شده");
+  } finally {
+    if (previous === undefined) delete process.env.CANDIDATE_APPLICATION_WITHDRAWAL_ENABLED;
+    else process.env.CANDIDATE_APPLICATION_WITHDRAWAL_ENABLED = previous;
+  }
 });
 
 test("Applications group under the correct status with accurate counts", () => {

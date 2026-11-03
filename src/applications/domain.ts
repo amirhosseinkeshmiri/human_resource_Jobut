@@ -2,7 +2,9 @@ import "server-only";
 import { and, asc, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
+  candidateCredentials,
   candidateResumes,
+  applicationResumeSnapshotCredentials,
   applicationResumeSnapshotEducations,
   applicationResumeSnapshotExperiences,
   applicationResumeSnapshotLanguages,
@@ -13,6 +15,7 @@ import {
   resumeExperiences,
   resumeLanguages,
 } from "@/db/schema";
+import { isCandidateCredentialsEnabled } from "@/candidate-credentials/feature";
 import { publicJobConditions } from "@/jobs/public-queries";
 import { isStoredResumeComplete } from "@/resume/policy";
 import { candidateResumeLockKey } from "@/resume/locking";
@@ -40,6 +43,11 @@ export async function createCandidateApplication(
       .where(eq(resumeEducations.resumeId, resume.id)).orderBy(asc(resumeEducations.sortOrder));
     const languages = await tx.select().from(resumeLanguages)
       .where(eq(resumeLanguages.resumeId, resume.id)).orderBy(asc(resumeLanguages.sortOrder));
+    const credentials = isCandidateCredentialsEnabled()
+      ? await tx.select().from(candidateCredentials)
+        .where(eq(candidateCredentials.candidateAccountId, candidateAccountId))
+        .orderBy(asc(candidateCredentials.issueDate), asc(candidateCredentials.createdAt))
+      : [];
     if (!isStoredResumeComplete({ ...resume, experiences, educations, languages })) return "resume-required";
 
     const [job] = await tx.select({ id: jobPosts.id }).from(jobPosts)
@@ -102,6 +110,22 @@ export async function createCandidateApplication(
           name: item.name,
           proficiency: item.proficiency,
           sortOrder: item.sortOrder,
+        })),
+      );
+    }
+    if (credentials.length) {
+      await tx.insert(applicationResumeSnapshotCredentials).values(
+        credentials.map((item, sortOrder) => ({
+          jobApplicationId: inserted.id,
+          recordType: item.recordType,
+          title: item.title,
+          issuer: item.issuer,
+          issueDate: item.issueDate,
+          expirationDate: item.expirationDate,
+          credentialId: item.credentialId,
+          verificationUrl: item.verificationUrl,
+          description: item.description,
+          sortOrder,
         })),
       );
     }

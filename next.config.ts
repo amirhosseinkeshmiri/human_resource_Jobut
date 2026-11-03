@@ -18,6 +18,9 @@ if (
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
+  outputFileTracingIncludes: {
+    "/api/candidate/resume/pdf": ["./node_modules/vazirmatn/fonts/ttf/*.ttf"],
+  },
   experimental: {
     // Keep Next.js on the stable TypeScript compiler API. The CLI preview path
     // currently drops captured --showConfig output under the pinned Node runtime.

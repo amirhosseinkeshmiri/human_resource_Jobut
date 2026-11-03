@@ -27,7 +27,7 @@ export function canSendApplicationMessage(input: {
   hasEmployerMessage: boolean;
 }) {
   if (input.jobStatus !== "published") return false;
-  if (input.applicationStatus === "rejected" || input.applicationStatus === "hired") return false;
+  if (input.applicationStatus === "rejected" || input.applicationStatus === "hired" || input.applicationStatus === "withdrawn") return false;
   if (input.senderRole === "candidate" && !input.hasEmployerMessage) return false;
   if (input.senderRole === "candidate" && input.kind !== "recruitment_message") return false;
   return true;

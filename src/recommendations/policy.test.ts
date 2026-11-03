@@ -1,6 +1,15 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { rankRecommendationCandidates, type RecommendationCandidate, type RecommendationProfile } from "./policy";
+import {
+  buildRecommendationReasonLabels,
+  deduplicateDisplaySkills,
+  normalizeRecommendationText,
+  rankRecommendationCandidates,
+  RECOMMENDATION_LIMIT,
+  RECOMMENDATION_SCORE_WEIGHTS,
+  type RecommendationCandidate,
+  type RecommendationProfile,
+} from "./policy";
 
 const profile: RecommendationProfile = {
   skills: ["TypeScript", "React"],
@@ -29,6 +38,16 @@ function job(overrides: Partial<RecommendationCandidate> = {}): RecommendationCa
 test("an overlapping skill creates recommendation eligibility case-insensitively", () => {
   const [recommendation] = rankRecommendationCandidates(profile, [job({ requiredSkills: [" typescript "] })]);
   assert.deepEqual(recommendation.reasons.matchedSkills, [" typescript "]);
+});
+
+test("normalizes Unicode, Arabic Persian variants, diacritics and half-spaces", () => {
+  assert.equal(normalizeRecommendationText("  كاربردِ يـادگیری  "), "کاربرد یادگیری");
+  assert.equal(normalizeRecommendationText("نرم‌افزار"), normalizeRecommendationText("نرم افزار"));
+  assert.equal(normalizeRecommendationText("ＴｙｐｅＳｃｒｉｐｔ"), "typescript");
+});
+
+test("deduplicates normalized skills while preserving the first display label", () => {
+  assert.deepEqual(deduplicateDisplaySkills(["React", " react ", "نرم‌افزار", "نرم افزار"]), ["React", "نرم‌افزار"]);
 });
 
 test("zero meaningful matches are excluded", () => {
@@ -83,6 +102,7 @@ test("more matching skills rank higher", () => {
     job({ id: "two", requiredSkills: ["React", "TypeScript"] }),
   ]);
   assert.equal(recommendations[0].job.id, "two");
+  assert.equal(recommendations[0].score, 2 * RECOMMENDATION_SCORE_WEIGHTS.skill);
 });
 
 test("newest publication and then stable ID break equal-score ties", () => {
@@ -108,6 +128,24 @@ test("matched skill list and reasons include only actual matches", () => {
     seniorityMatched: false,
     resumeCityMatched: false,
   });
+  assert.deepEqual(buildRecommendationReasonLabels(recommendation.reasons), [
+    "مهارت مشترک: React، TypeScript",
+    "شهر موردنظر شما",
+    "نحوه حضور موردنظر شما",
+  ]);
+});
+
+test("duplicate required skills neither inflate score nor explanations", () => {
+  const [recommendation] = rankRecommendationCandidates(profile, [job({ requiredSkills: ["React", " react ", "REACT"] })]);
+  assert.deepEqual(recommendation.reasons.matchedSkills, ["React"]);
+  assert.equal(recommendation.score, RECOMMENDATION_SCORE_WEIGHTS.skill);
+});
+
+test("recommendation output is strictly bounded", () => {
+  const jobs = Array.from({ length: RECOMMENDATION_LIMIT + 5 }, (_, index) => job({
+    id: String(index).padStart(3, "0"),
+  }));
+  assert.equal(rankRecommendationCandidates(profile, jobs).length, RECOMMENDATION_LIMIT);
 });
 
 test("non-public and already-applied Jobs are excluded without affecting other Candidates", () => {

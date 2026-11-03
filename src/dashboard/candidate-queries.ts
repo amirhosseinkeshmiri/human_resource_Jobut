@@ -1,5 +1,5 @@
 import "server-only";
-import { desc, eq, sql } from "drizzle-orm";
+import { count, desc, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { companies, jobApplications, jobPosts } from "@/db/schema";
 import {
@@ -8,16 +8,15 @@ import {
 } from "./candidate-policy";
 
 export async function getCandidateDashboardApplicationMetrics(candidateAccountId: string) {
-  const [metrics] = await db.select({
-    total: sql<number>`count(*)`.mapWith(Number),
-    received: sql<number>`count(*) filter (where ${jobApplications.status} = 'received')`.mapWith(Number),
-    reviewing: sql<number>`count(*) filter (where ${jobApplications.status} = 'reviewing')`.mapWith(Number),
-    interview: sql<number>`count(*) filter (where ${jobApplications.status} = 'interview')`.mapWith(Number),
-    rejected: sql<number>`count(*) filter (where ${jobApplications.status} = 'rejected')`.mapWith(Number),
-    hired: sql<number>`count(*) filter (where ${jobApplications.status} = 'hired')`.mapWith(Number),
-  }).from(jobApplications)
-    .where(eq(jobApplications.candidateAccountId, candidateAccountId));
-
+  const rows = await db.select({ status: jobApplications.status, value: count() })
+    .from(jobApplications)
+    .where(eq(jobApplications.candidateAccountId, candidateAccountId))
+    .groupBy(jobApplications.status);
+  const metrics = { total: 0, received: 0, reviewing: 0, interview: 0, rejected: 0, hired: 0, withdrawn: 0 };
+  for (const row of rows) {
+    metrics[row.status] = row.value;
+    metrics.total += row.value;
+  }
   return normalizeCandidateApplicationMetrics(metrics);
 }
 

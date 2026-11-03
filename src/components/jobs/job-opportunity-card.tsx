@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import Link from "next/link";
 import { Badge, Card } from "@/components/ui";
 import { PUBLIC_JOB_LABEL } from "@/jobs/public-copy";
@@ -20,6 +21,7 @@ interface JobOpportunityCardProps {
   reasons?: string[];
   variant?: "full" | "compact";
   headingLevel?: "h2" | "h3";
+  footerAction?: ReactNode;
 }
 
 const dateFormatter = new Intl.DateTimeFormat("fa-IR", { dateStyle: "medium" });
@@ -31,6 +33,7 @@ export function JobOpportunityCard({
   reasons = [],
   variant = "full",
   headingLevel = "h2",
+  footerAction,
 }: JobOpportunityCardProps) {
   const presentation = buildJobOpportunityPresentation(job, skills, reasons);
   const { visible: visibleSkills, remaining: remainingSkills } = presentation.skills;
@@ -63,7 +66,7 @@ export function JobOpportunityCard({
 
     <div className="mt-auto flex flex-wrap items-end justify-between gap-3 border-t border-ui-border pt-4">
       {job.publishedAt && variant === "full" ? <time className="text-meta" dateTime={job.publishedAt.toISOString()}>{dateFormatter.format(job.publishedAt)}</time> : <span />}
-      <Link href={detailHref} className="inline-flex min-h-10 items-center rounded-md text-sm font-semibold text-action outline-none hover:text-action-hover focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2">مشاهده {PUBLIC_JOB_LABEL} ←</Link>
+      <div className="flex flex-wrap items-center gap-2">{footerAction}<Link href={detailHref} className="inline-flex min-h-10 items-center rounded-md text-sm font-semibold text-action outline-none hover:text-action-hover focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2">مشاهده {PUBLIC_JOB_LABEL} ←</Link></div>
     </div>
   </Card>;
 }

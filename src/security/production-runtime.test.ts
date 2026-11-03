@@ -46,6 +46,24 @@ test("accepts the canonical HTTPS production configuration", () => {
   assert.equal(existsSync(path.join(uploadStorageDirectory, "company-media")), true);
 });
 
+test("verifies candidate profile photo storage only when its feature is enabled", () => {
+  const root = mkdtempSync(path.join(tmpdir(), "jobut-runtime-profile-photo-"));
+  const result = verify({ UPLOAD_STORAGE_DIR: root, CANDIDATE_PROFILE_PHOTO_ENABLED: "true" });
+  assert.equal(result.status, 0);
+  assert.equal(existsSync(path.join(root, "candidate-profile-photos")), true);
+});
+
+test("rejects an invalid candidate profile photo feature flag", () => {
+  assert.notEqual(verify({ CANDIDATE_PROFILE_PHOTO_ENABLED: "TRUE" }).status, 0);
+});
+
+test("verifies private credential storage only when credentials are enabled", () => {
+  const root = mkdtempSync(path.join(tmpdir(), "jobut-runtime-credentials-"));
+  const result = verify({ UPLOAD_STORAGE_DIR: root, CANDIDATE_CREDENTIALS_ENABLED: "true" });
+  assert.equal(result.status, 0);
+  assert.equal(existsSync(path.join(root, "candidate-credentials")), true);
+});
+
 test("rejects non-production runtime modes", () => {
   const result = verify({ NODE_ENV: "running" });
   assert.notEqual(result.status, 0);

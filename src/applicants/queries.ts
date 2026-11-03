@@ -3,6 +3,7 @@ import { and, asc, count, desc, eq, sql } from "drizzle-orm";
 import { APPLICATION_STATUSES, type ApplicationStatusFilter } from "@/applications/status-policy";
 import { db } from "@/db";
 import {
+  applicationResumeSnapshotCredentials,
   applicationResumeSnapshotEducations,
   applicationResumeSnapshotExperiences,
   applicationResumeSnapshotLanguages,
@@ -11,6 +12,7 @@ import {
   jobApplicationStatusHistory,
   jobPosts,
 } from "@/db/schema";
+import { isCandidateCredentialsEnabled } from "@/candidate-credentials/feature";
 import {
   EMPLOYER_APPLICANTS_PAGE_SIZE,
   getApplicantPageCount,
@@ -32,11 +34,6 @@ export async function getEmployerJobPipeline(companyId: string, jobId: string) {
     jobTitle: jobPosts.title,
     jobStatus: jobPosts.status,
     total: sql<number>`count(${jobApplications.id}) over ()`,
-    receivedCount: sql<number>`count(${jobApplications.id}) filter (where ${jobApplications.status} = 'received') over ()`,
-    reviewingCount: sql<number>`count(${jobApplications.id}) filter (where ${jobApplications.status} = 'reviewing') over ()`,
-    interviewCount: sql<number>`count(${jobApplications.id}) filter (where ${jobApplications.status} = 'interview') over ()`,
-    rejectedCount: sql<number>`count(${jobApplications.id}) filter (where ${jobApplications.status} = 'rejected') over ()`,
-    hiredCount: sql<number>`count(${jobApplications.id}) filter (where ${jobApplications.status} = 'hired') over ()`,
     applicationId: jobApplications.id,
     snapshotApplicationId: applicationResumeSnapshots.jobApplicationId,
     firstName: applicationResumeSnapshots.firstName,
@@ -59,12 +56,12 @@ export async function getEmployerJobPipeline(companyId: string, jobId: string) {
   const first = rows[0];
   if (!first) return null;
 
+  const countRows = await db.select({ status: jobApplications.status, value: count() })
+    .from(jobApplications)
+    .where(eq(jobApplications.jobPostId, first.jobId))
+    .groupBy(jobApplications.status);
   const counts = emptyPipelineStatusCounts();
-  counts.received = Number(first.receivedCount);
-  counts.reviewing = Number(first.reviewingCount);
-  counts.interview = Number(first.interviewCount);
-  counts.rejected = Number(first.rejectedCount);
-  counts.hired = Number(first.hiredCount);
+  for (const row of countRows) counts[row.status] = row.value;
 
   const applications: PipelineApplication[] = [];
   for (const row of rows) {
@@ -177,13 +174,16 @@ export async function getEmployerApplicantResume(companyId: string, jobId: strin
     )).limit(1);
   if (!result) return null;
 
-  const [experiences, educations, languages, statusHistory] = await Promise.all([
+  const [experiences, educations, languages, credentials, statusHistory] = await Promise.all([
     db.select({ jobTitle: applicationResumeSnapshotExperiences.jobTitle, companyName: applicationResumeSnapshotExperiences.companyName, startDate: applicationResumeSnapshotExperiences.startDate, endDate: applicationResumeSnapshotExperiences.endDate, isCurrent: applicationResumeSnapshotExperiences.isCurrent, description: applicationResumeSnapshotExperiences.description })
       .from(applicationResumeSnapshotExperiences).where(eq(applicationResumeSnapshotExperiences.jobApplicationId, result.applicationId)).orderBy(asc(applicationResumeSnapshotExperiences.sortOrder)),
     db.select({ fieldOfStudy: applicationResumeSnapshotEducations.fieldOfStudy, institutionName: applicationResumeSnapshotEducations.institutionName, degree: applicationResumeSnapshotEducations.degree, startDate: applicationResumeSnapshotEducations.startDate, endDate: applicationResumeSnapshotEducations.endDate, isCurrent: applicationResumeSnapshotEducations.isCurrent })
       .from(applicationResumeSnapshotEducations).where(eq(applicationResumeSnapshotEducations.jobApplicationId, result.applicationId)).orderBy(asc(applicationResumeSnapshotEducations.sortOrder)),
     db.select({ name: applicationResumeSnapshotLanguages.name, proficiency: applicationResumeSnapshotLanguages.proficiency })
       .from(applicationResumeSnapshotLanguages).where(eq(applicationResumeSnapshotLanguages.jobApplicationId, result.applicationId)).orderBy(asc(applicationResumeSnapshotLanguages.sortOrder)),
+    isCandidateCredentialsEnabled()
+      ? db.select().from(applicationResumeSnapshotCredentials).where(eq(applicationResumeSnapshotCredentials.jobApplicationId, result.applicationId)).orderBy(asc(applicationResumeSnapshotCredentials.sortOrder))
+      : Promise.resolve([]),
     db.select({
       id: jobApplicationStatusHistory.id,
       fromStatus: jobApplicationStatusHistory.fromStatus,
@@ -201,6 +201,7 @@ export async function getEmployerApplicantResume(companyId: string, jobId: strin
     experiences,
     educations,
     languages,
+    credentials,
     statusHistory,
   };
 }

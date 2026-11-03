@@ -6,6 +6,9 @@ import { ResumeBuilderForm } from "@/components/resume/resume-builder-form";
 import { ResumePreview } from "@/components/resume/resume-preview";
 import { saveCandidateResume } from "@/resume/actions";
 import { getCandidateResume } from "@/resume/queries";
+import { CandidateCredentialsManager } from "@/components/resume/candidate-credentials-manager";
+import { isCandidateCredentialsEnabled } from "@/candidate-credentials/feature";
+import { listCandidateCredentials } from "@/candidate-credentials/repository";
 
 export const metadata: Metadata = { title: "رزومه من" };
 
@@ -13,7 +16,12 @@ interface PageProps { searchParams: Promise<{ mode?: string | string[]; saved?: 
 
 export default async function CandidateResumePage({ searchParams }: PageProps) {
   const candidate = await requireCandidate();
-  const [resume, query] = await Promise.all([getCandidateResume(candidate.id), searchParams]);
+  const credentialsEnabled = isCandidateCredentialsEnabled();
+  const [resume, query, credentials] = await Promise.all([
+    getCandidateResume(candidate.id),
+    searchParams,
+    credentialsEnabled ? listCandidateCredentials(candidate.id) : Promise.resolve([]),
+  ]);
   const mode = Array.isArray(query.mode) ? query.mode[0] : query.mode;
   const saved = (Array.isArray(query.saved) ? query.saved[0] : query.saved) === "1";
   const invalid = (Array.isArray(query.error) ? query.error[0] : query.error) === "invalid";
@@ -35,5 +43,5 @@ export default async function CandidateResumePage({ searchParams }: PageProps) {
   return <CandidateShell current="resume"><div className="mx-auto max-w-4xl">{saved && resume ? <FormDraftCleanup storage="session" scopes={[
     { accountId: candidate.id, formId: "candidate-resume", entityId: "new" },
     { accountId: candidate.id, formId: "candidate-resume", entityId: resume.id },
-  ]} /> : null}{saved ? <p role="status" className="mb-5 rounded-md border border-success/30 bg-success/5 p-3 text-sm font-semibold text-success">رزومه با موفقیت ذخیره شد.</p> : null}{resume && mode !== "edit" ? <ResumePreview resume={resume} /> : <><div className="mb-7"><p className="text-meta">رزومه ساختاریافته شبکه استخدامی متخصصین آکادمیک</p><h1 className="text-page-title mt-2">{resume ? "ویرایش رزومه" : "ساخت رزومه"}</h1><p className="text-secondary mt-3">اطلاعات حرفه‌ای خود را در بخش‌های کوتاه و مشخص تکمیل کنید.</p></div><ResumeBuilderForm action={saveCandidateResume} initialValues={initialValues} candidateAccountId={candidate.id} resumeEntityId={resume?.id ?? "new"} serverUpdatedAt={resume?.updatedAt.getTime() ?? 0} serverError={invalid ? "اطلاعات ارسالی معتبر نبود. لطفاً فیلدها را بررسی کنید." : undefined} /></>}</div></CandidateShell>;
+  ]} /> : null}{saved ? <p role="status" className="mb-5 rounded-md border border-success/30 bg-success/5 p-3 text-sm font-semibold text-success">رزومه با موفقیت ذخیره شد.</p> : null}{resume && mode !== "edit" ? <ResumePreview resume={resume} /> : <><div className="mb-7"><p className="text-meta">رزومه ساختاریافته شبکه استخدامی متخصصین آکادمیک</p><h1 className="text-page-title mt-2">{resume ? "ویرایش رزومه" : "ساخت رزومه"}</h1><p className="text-secondary mt-3">اطلاعات حرفه‌ای خود را در بخش‌های کوتاه و مشخص تکمیل کنید.</p></div><ResumeBuilderForm action={saveCandidateResume} initialValues={initialValues} candidateAccountId={candidate.id} resumeEntityId={resume?.id ?? "new"} serverUpdatedAt={resume?.updatedAt.getTime() ?? 0} serverError={invalid ? "اطلاعات ارسالی معتبر نبود. لطفاً فیلدها را بررسی کنید." : undefined} /></>}{credentialsEnabled ? <CandidateCredentialsManager initialRecords={credentials.map((record) => ({ ...record, issueDate: record.issueDate ?? "", expirationDate: record.expirationDate ?? "", credentialId: record.credentialId ?? "", verificationUrl: record.verificationUrl ?? "", description: record.description ?? "" }))} /> : null}</div></CandidateShell>;
 }

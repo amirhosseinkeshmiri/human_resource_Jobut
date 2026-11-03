@@ -17,7 +17,7 @@ export async function materializeApplicationStatusNotificationsForApplication(ap
     select a.candidate_account_id, h.id, h.changed_at
     from job_application_status_history h
     inner join job_applications a on a.id = h.job_application_id
-    where a.id = ${applicationId}
+    where a.id = ${applicationId} and h.to_status::text <> 'withdrawn'
     on conflict (status_history_id) do nothing
   `);
 }
@@ -29,7 +29,7 @@ export async function materializeCandidateApplicationStatusNotifications(candida
     select a.candidate_account_id, h.id, h.changed_at
     from job_application_status_history h
     inner join job_applications a on a.id = h.job_application_id
-    where a.candidate_account_id = ${candidateAccountId}
+    where a.candidate_account_id = ${candidateAccountId} and h.to_status::text <> 'withdrawn'
     on conflict (status_history_id) do nothing
   `);
 }
