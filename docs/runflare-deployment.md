@@ -39,7 +39,7 @@ production نیستند.
 - `UPLOAD_STORAGE_DIR=/app/uploads`
 - `SEP_TERMINAL_ID`
 - `SEP_CALLBACK_URL`
-- `SMS_PROVIDER`
+- `SMS_PROVIDER=melipayamak`
 - `EMAIL_PROVIDER` (`smtp`)
 - `EMAIL_FROM`
 - `EMAIL_FROM_NAME`
@@ -49,9 +49,9 @@ production نیستند.
 - `SMTP_USER`
 - `SMTP_PASS`
 - `SMTP_TIMEOUT_MS`
-- `MELIPAYAMAK_SHARED_ENDPOINT`
-- `MELIPAYAMAK_BODY_ID`
-- `SMS_TIMEOUT_MS`
+- `MELIPAYAMAK_SHARED_ENDPOINT` (endpoint کامل و محرمانه HTTPS صادرشده از پنل با مسیر `/api/send/shared/...`)
+- `MELIPAYAMAK_BODY_ID` (شناسه عددی مثبت قالب تأییدشده؛ برای JobUT فعلی `561397`)
+- `SMS_TIMEOUT_MS` (عدد صحیح بین `1000` و `15000`؛ مقدار پیشنهادی `5000`)
 - `OTP_RATE_LIMIT_IDENTIFIER_MAX=3`
 - `OTP_RATE_LIMIT_IDENTIFIER_WINDOW_SECONDS=600`
 - `OTP_RATE_LIMIT_ACCOUNT_MAX=3`

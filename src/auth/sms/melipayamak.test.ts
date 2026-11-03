@@ -125,12 +125,15 @@ test("shared-template SMS request uses exact POST JSON and preserves the OTP str
   assert.equal(JSON.stringify(body).includes("a-development-test-secret-with-32-characters"), false);
 });
 
-test("provider response accepts only documented recId/status structure", async () => {
-  await sendMeliPayamakOtp(
-    "+989121234567",
-    "123456",
-    (async () => Response.json({ recId: 1, status: "error description if applicable" })) as typeof fetch,
-    providerEnvironment,
+test("provider response accepts only a positive recId with an empty status", async () => {
+  await assert.rejects(
+    sendMeliPayamakOtp(
+      "+989121234567",
+      "123456",
+      (async () => Response.json({ recId: 1, status: "error description if applicable" })) as typeof fetch,
+      providerEnvironment,
+    ),
+    assertCategory("rejected"),
   );
   for (const response of [
     new Response("not-json", { status: 200 }),
@@ -144,6 +147,26 @@ test("provider response accepts only documented recId/status structure", async (
     await assert.rejects(
       sendMeliPayamakOtp("+989121234567", "123456", (async () => response) as typeof fetch, providerEnvironment),
       assertCategory("invalid_response"),
+    );
+  }
+});
+
+test("documented shared-service error recIds are rejected and categorized", async () => {
+  for (const [recId, category] of [
+    [0, "authentication"],
+    [2, "insufficient_credit"],
+    [-4, "invalid_pattern"],
+    [-5, "invalid_pattern"],
+    [-1, "rejected"],
+  ] as const) {
+    await assert.rejects(
+      sendMeliPayamakOtp(
+        "+989121234567",
+        "123456",
+        (async () => Response.json({ recId, status: "provider detail must not be logged" })) as typeof fetch,
+        providerEnvironment,
+      ),
+      assertCategory(category),
     );
   }
 });
@@ -173,11 +196,13 @@ test("provider failures, redirects, and bounded responses fail safely without re
   }
 });
 
-test("provider operation logs neither endpoint nor OTP nor SMS body", async () => {
+test("provider operation logs structured metadata but no endpoint, recipient, OTP, body, or status text", async () => {
   const originalLog = console.log;
+  const originalInfo = console.info;
   const originalError = console.error;
   const entries: unknown[] = [];
   console.log = (...values: unknown[]) => { entries.push(values); };
+  console.info = (...values: unknown[]) => { entries.push(values); };
   console.error = (...values: unknown[]) => { entries.push(values); };
   try {
     await sendMeliPayamakOtp(
@@ -185,12 +210,22 @@ test("provider operation logs neither endpoint nor OTP nor SMS body", async () =
       "123456",
       (async () => Response.json({ recId: 1, status: "" })) as typeof fetch,
       providerEnvironment,
+      "00000000-0000-4000-8000-000000000004",
     );
   } finally {
     console.log = originalLog;
+    console.info = originalInfo;
     console.error = originalError;
   }
-  assert.deepEqual(entries, []);
+  assert.equal(entries.length, 1);
+  const serialized = JSON.stringify(entries);
+  assert.equal(serialized.includes("sms_provider_attempt"), true);
+  assert.equal(serialized.includes("00000000-0000-4000-8000-000000000004"), true);
+  assert.equal(serialized.includes("melipayamak"), true);
+  assert.equal(serialized.includes("accepted"), true);
+  for (const sensitive of [endpoint, "+989121234567", "09121234567", "123456", "bodyId", "args"]) {
+    assert.equal(serialized.includes(sensitive), false);
+  }
 });
 
 test("two-phase challenge hashes locally generated OTP and never persists raw OTP", async () => {

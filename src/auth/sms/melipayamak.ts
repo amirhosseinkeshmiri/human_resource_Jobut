@@ -1,5 +1,7 @@
 import "server-only";
 
+import { randomUUID } from "node:crypto";
+
 const EXPECTED_HOSTNAME = "console.melipayamak.com";
 const DEFAULT_TIMEOUT_MS = 5_000;
 const MIN_TIMEOUT_MS = 1_000;
@@ -12,10 +14,17 @@ export type SmsProviderFailureCategory =
   | "network"
   | "http"
   | "response_too_large"
-  | "invalid_response";
+  | "invalid_response"
+  | "authentication"
+  | "invalid_pattern"
+  | "insufficient_credit"
+  | "rejected";
 
 export class SmsProviderError extends Error {
-  constructor(public readonly category: SmsProviderFailureCategory) {
+  constructor(
+    public readonly category: SmsProviderFailureCategory,
+    public readonly providerCode?: string,
+  ) {
     super(category);
     this.name = "SmsProviderError";
   }
@@ -77,6 +86,35 @@ export function toMeliPayamakPhone(canonicalMobile: string) {
   return `0${subscriber}`;
 }
 
+function rejectionCategory(recId: number): SmsProviderFailureCategory {
+  if (recId === 0) return "authentication";
+  if (recId === 2) return "insufficient_credit";
+  if (recId === -4 || recId === -5) return "invalid_pattern";
+  return "rejected";
+}
+
+function logProviderAttempt(input: {
+  correlationId: string;
+  outcome: "accepted" | "rejected" | "failed";
+  startedAt: number;
+  error?: SmsProviderError;
+}) {
+  const entry = JSON.stringify({
+    event: "sms_provider_attempt",
+    correlationId: input.correlationId,
+    provider: "melipayamak",
+    sendingMode: "shared_template",
+    outcome: input.outcome,
+    ...(input.error ? {
+      errorCategory: input.error.category,
+      ...(input.error.providerCode ? { providerCode: input.error.providerCode } : {}),
+    } : {}),
+    durationMs: Math.max(0, Date.now() - input.startedAt),
+  });
+  if (input.outcome === "accepted") console.info(entry);
+  else console.error(entry);
+}
+
 async function readBoundedBody(response: Response) {
   const declaredSize = Number(response.headers.get("content-length"));
   if (Number.isFinite(declaredSize) && declaredSize > MAX_RESPONSE_BYTES) {
@@ -116,57 +154,78 @@ export async function sendMeliPayamakOtp(
   verificationCode: string,
   fetchImplementation: typeof fetch = fetch,
   environment: Record<string, string | undefined> = process.env,
+  correlationId: string = randomUUID(),
 ) {
-  const config = loadMeliPayamakConfig(environment);
-  if (!/^[0-9]{6}$/.test(verificationCode)) {
-    throw new SmsProviderError("configuration");
-  }
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), config.timeoutMs);
-  let response: Response;
+  const startedAt = Date.now();
   try {
-    response = await fetchImplementation(config.endpoint, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        bodyId: config.bodyId,
-        to: toMeliPayamakPhone(canonicalMobile),
-        args: [verificationCode],
-      }),
-      redirect: "error",
-      cache: "no-store",
-      signal: controller.signal,
-    });
-  } catch (error) {
-    if (error instanceof SmsProviderError) throw error;
-    if (error instanceof Error && error.name === "AbortError") {
-      throw new SmsProviderError("timeout");
+    const config = loadMeliPayamakConfig(environment);
+    if (!/^[0-9]{6}$/.test(verificationCode)) {
+      throw new SmsProviderError("configuration");
     }
-    throw new SmsProviderError("network");
-  } finally {
-    clearTimeout(timeout);
-  }
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), config.timeoutMs);
+    let response: Response;
+    try {
+      response = await fetchImplementation(config.endpoint, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          bodyId: config.bodyId,
+          to: toMeliPayamakPhone(canonicalMobile),
+          args: [verificationCode],
+        }),
+        redirect: "error",
+        cache: "no-store",
+        signal: controller.signal,
+      });
+    } catch (error) {
+      if (error instanceof SmsProviderError) throw error;
+      if (error instanceof Error && error.name === "AbortError") {
+        throw new SmsProviderError("timeout");
+      }
+      throw new SmsProviderError("network");
+    } finally {
+      clearTimeout(timeout);
+    }
 
-  if (!response.ok) throw new SmsProviderError("http");
-  let rawBody: string;
-  try {
-    rawBody = await readBoundedBody(response);
+    if (!response.ok) throw new SmsProviderError("http", `http_${response.status}`);
+    let rawBody: string;
+    try {
+      rawBody = await readBoundedBody(response);
+    } catch (error) {
+      if (error instanceof SmsProviderError) throw error;
+      throw new SmsProviderError("network");
+    }
+    let body: unknown;
+    try {
+      body = JSON.parse(rawBody) as unknown;
+    } catch {
+      throw new SmsProviderError("invalid_response");
+    }
+    if (!body || typeof body !== "object" || Array.isArray(body)) {
+      throw new SmsProviderError("invalid_response");
+    }
+    const { recId, status } = body as { recId?: unknown; status?: unknown };
+    if (typeof recId !== "number" || !Number.isSafeInteger(recId) || typeof status !== "string") {
+      throw new SmsProviderError("invalid_response");
+    }
+    if (status.trim() !== "" || recId <= 0) {
+      const error = new SmsProviderError(rejectionCategory(recId), `rec_id_${recId}`);
+      logProviderAttempt({ correlationId, outcome: "rejected", startedAt, error });
+      throw error;
+    }
+    logProviderAttempt({ correlationId, outcome: "accepted", startedAt });
+    return { recId, status };
   } catch (error) {
-    if (error instanceof SmsProviderError) throw error;
-    throw new SmsProviderError("network");
+    const providerError = error instanceof SmsProviderError
+      ? error
+      : new SmsProviderError("network");
+    if (providerError.category !== "authentication" &&
+        providerError.category !== "invalid_pattern" &&
+        providerError.category !== "insufficient_credit" &&
+        providerError.category !== "rejected") {
+      logProviderAttempt({ correlationId, outcome: "failed", startedAt, error: providerError });
+    }
+    throw providerError;
   }
-  let body: unknown;
-  try {
-    body = JSON.parse(rawBody) as unknown;
-  } catch {
-    throw new SmsProviderError("invalid_response");
-  }
-  if (!body || typeof body !== "object" || Array.isArray(body)) {
-    throw new SmsProviderError("invalid_response");
-  }
-  const { recId, status } = body as { recId?: unknown; status?: unknown };
-  if (typeof recId !== "number" || !Number.isFinite(recId) || typeof status !== "string") {
-    throw new SmsProviderError("invalid_response");
-  }
-  return { recId, status };
 }

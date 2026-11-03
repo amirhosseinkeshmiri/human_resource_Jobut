@@ -17,6 +17,10 @@ const validEnvironment = {
   SMTP_HOST: "smtp.example.com",
   SMTP_PORT: "465",
   SMTP_SECURE: "true",
+  SMS_PROVIDER: "melipayamak",
+  MELIPAYAMAK_SHARED_ENDPOINT: "https://console.melipayamak.com/api/send/shared/test-secret",
+  MELIPAYAMAK_BODY_ID: "561397",
+  SMS_TIMEOUT_MS: "5000",
   OTP_RATE_LIMIT_IDENTIFIER_MAX: "3",
   OTP_RATE_LIMIT_IDENTIFIER_WINDOW_SECONDS: "600",
   OTP_RATE_LIMIT_ACCOUNT_MAX: "3",
@@ -84,6 +88,19 @@ test("rejects a SEP callback on a different origin", () => {
 test("rejects production runtime without SMTP delivery", () => {
   const result = verify({ EMAIL_PROVIDER: "" });
   assert.notEqual(result.status, 0);
+});
+
+test("rejects missing or invalid MeliPayamak production configuration", () => {
+  for (const overrides of [
+    { SMS_PROVIDER: "" },
+    { MELIPAYAMAK_SHARED_ENDPOINT: "" },
+    { MELIPAYAMAK_SHARED_ENDPOINT: "https://example.com/api/send/shared/secret" },
+    { MELIPAYAMAK_SHARED_ENDPOINT: "https://console.melipayamak.com/api/send/shared/" },
+    { MELIPAYAMAK_BODY_ID: "0" },
+    { SMS_TIMEOUT_MS: "999" },
+  ]) {
+    assert.notEqual(verify(overrides).status, 0);
+  }
 });
 
 test("rejects production runtime without a mounted upload directory", () => {

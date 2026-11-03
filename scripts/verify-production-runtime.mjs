@@ -7,6 +7,7 @@ const CALLBACK_PATH = "/api/payments/sep/callback";
 const COMPANY_MEDIA_DIRECTORY = "company-media";
 const CANDIDATE_PROFILE_PHOTO_DIRECTORY = "candidate-profile-photos";
 const CANDIDATE_CREDENTIAL_DIRECTORY = "candidate-credentials";
+const MELIPAYAMAK_HOSTNAME = "console.melipayamak.com";
 
 function verifyStorageSubdirectory(realStorageDirectory, subdirectory) {
   const directory = path.join(realStorageDirectory, subdirectory);
@@ -117,6 +118,27 @@ export function verifyProductionRuntime(environment = process.env) {
   }
   if (Boolean(environment.SMTP_USER) !== Boolean(environment.SMTP_PASS)) {
     throw new Error("SMTP_USER and SMTP_PASS must either both be set or both be omitted.");
+  }
+  if (environment.SMS_PROVIDER !== "melipayamak") {
+    throw new Error("SMS_PROVIDER must be melipayamak in production.");
+  }
+  const melipayamakEndpoint = readHttpsUrl(environment, "MELIPAYAMAK_SHARED_ENDPOINT");
+  if (
+    melipayamakEndpoint.hostname !== MELIPAYAMAK_HOSTNAME ||
+    (melipayamakEndpoint.port !== "" && melipayamakEndpoint.port !== "443") ||
+    !melipayamakEndpoint.pathname.startsWith("/api/send/shared/") ||
+    melipayamakEndpoint.pathname === "/api/send/shared/"
+  ) {
+    throw new Error("MELIPAYAMAK_SHARED_ENDPOINT must be the complete MeliPayamak shared-service endpoint.");
+  }
+  const melipayamakBodyId = environment.MELIPAYAMAK_BODY_ID;
+  if (!melipayamakBodyId || !/^[1-9][0-9]*$/.test(melipayamakBodyId) ||
+      !Number.isSafeInteger(Number(melipayamakBodyId))) {
+    throw new Error("MELIPAYAMAK_BODY_ID must be a positive integer in production.");
+  }
+  const smsTimeoutMs = Number(environment.SMS_TIMEOUT_MS);
+  if (!Number.isInteger(smsTimeoutMs) || smsTimeoutMs < 1_000 || smsTimeoutMs > 15_000) {
+    throw new Error("SMS_TIMEOUT_MS must be an integer between 1000 and 15000.");
   }
   const otpIntegerVariables = [
     "OTP_RATE_LIMIT_IDENTIFIER_MAX",

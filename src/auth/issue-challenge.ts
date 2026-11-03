@@ -61,7 +61,7 @@ export async function issueVerificationChallenge(
     stage = "rate_limit";
     await callbacks.authorize?.();
     stage = "provider_delivery";
-    const delivery = await deliver(identifier, verificationCode);
+    const delivery = await deliver(identifier, verificationCode, { correlationId });
     const codeDigest = digestVerificationCode(id, verificationCode, secret);
     stage = "challenge_activate";
     const activated = await callbacks.activate({

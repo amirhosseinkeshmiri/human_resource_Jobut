@@ -19,6 +19,10 @@ const PROVIDER_CODES = new Set([
   "http",
   "response_too_large",
   "invalid_response",
+  "authentication",
+  "invalid_pattern",
+  "insufficient_credit",
+  "rejected",
 ]);
 const SMTP_CODES = new Map([
   ["EAUTH", "smtp_authentication"],

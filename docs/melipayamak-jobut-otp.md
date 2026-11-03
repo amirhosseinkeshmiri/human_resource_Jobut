@@ -5,7 +5,11 @@
 ## قرارداد
 
 - درخواست: `POST` با JSON دقیق `{ "bodyId": 561397, "to": "09123456789", "args": ["123456"] }`
-- پاسخ معتبر: JSON دارای `recId` عددی و `status` متنی، مانند `{ "recId": 3741437414, "status": "" }`
+- پذیرش API فقط وقتی ثبت می‌شود که پاسخ HTTP موفق، JSON دارای `recId` صحیح و مثبت و
+  `status` خالی باشد؛ مانند `{ "recId": 3741437414, "status": "" }`. پاسخ HTTP 200
+  با `status` غیرخالی یا `recId` صفر/منفی رد provider است، نه ارسال موفق.
+- پذیرش API به معنی تحویل به گوشی نیست. `recId` صرفاً شناسه لازم برای پیگیری delivery
+  در پنل/ابزار گزارش MeliPayamak است؛ برنامه بدون گزارش delivery ادعای تحویل نمی‌کند.
 - `args` دقیقاً یک عضو دارد: OTP شش‌رقمی به‌صورت string تا صفر ابتدایی حفظ شود. متن آزاد، شماره فرستنده، API key field یا داده هویتی کاربر ارسال نمی‌شود.
 
 کد شش‌رقمی را Jobut با random cryptographic تولید می‌کند. Jobut ابتدا challenge منقضی و غیرقابل‌استفاده رزرو می‌کند، OTP خام را فقط به‌عنوان آرگومان قالب در درخواست شبکه می‌فرستد و پس از پاسخ معتبر provider فقط HMAC کد را در مرحله فعال‌سازی ذخیره می‌کند. OTP خام نه persist و نه log می‌شود.
@@ -39,6 +43,18 @@ APP_URL=https://www.jobut.ir
 
 endpoint باید HTTPS، با مسیر `/api/send/shared/...`، بدون redirect/query/fragment/URL credentials، روی hostname دقیق `console.melipayamak.com` و پورت استاندارد باشد. `MELIPAYAMAK_BODY_ID` باید عدد صحیح مثبت باشد. `AUTH_SECRET` موجود برای HMAC استفاده می‌شود.
 
+در این روش shared-template، credential داخل endpoint محرمانه‌ای است که پنل صادر می‌کند؛
+نام کاربری، رمز عبور یا شماره فرستنده جداگانه در request وجود ندارد. خطاهای مستند
+shared service شامل `recId=0` برای authentication، `2` برای اعتبار ناکافی، `-4` برای
+Body ID نامعتبر/تأییدنشده و `-5` برای عدم تطابق آرگومان‌های قالب هستند. سایر کدهای
+صفر/منفی و هر `status` غیرخالی نیز به‌صورت رد عمومی fail-closed می‌شوند. متن خام status
+در log ذخیره نمی‌شود.
+
+startup در production همین انتخاب provider، endpoint کامل، Body ID و timeout بین
+۱۰۰۰ تا ۱۵۰۰۰ میلی‌ثانیه را پیش از شروع سرور بررسی می‌کند. هر تلاش provider فقط با
+correlation ID، mode، outcome، دسته/کد امن و زمان اجرا log می‌شود؛ endpoint، شماره،
+OTP، body و متن خام پاسخ log نمی‌شوند.
+
 محدودکننده OTP با رویدادهای rolling-window و قفل transaction-level اتمیک PostgreSQL و پیش از فراخوانی provider اجرا می‌شود. کلید شناسه، حساب و IP با HMAC ساخته می‌شود و مقدار خام در جدول limiter ذخیره نمی‌شود. سهمیه شناسه میان نقش‌ها مشترک، سهمیه حساب برای هر نقش جدا، بودجه provider سراسری و Admin دارای bucket سخت‌گیرانه‌تر است. شکست provider سهمیه رزروشده را برنمی‌گرداند و circuit breaker مشترک را تغذیه می‌کند؛ خرابی limiter نیز ارسال را fail-closed متوقف می‌کند.
 
 در ورود Admin، شناسه‌های معتبر از نظر قالب همیشه پاسخ عمومی challenge‌شکل یکسان می‌گیرند. شناسه ناشناخته از limiter سخت‌گیرانه Admin عبور می‌کند و فقط محاسبه رمزنگاری decoy انجام می‌دهد؛ هیچ پیامک، challenge پایدار، حساب یا session برای آن ساخته نمی‌شود. خطاهای provider، cooldown و verification نیز وجود حساب را در پیام یا redirect آشکار نمی‌کنند.
@@ -54,10 +70,10 @@ IP protection و hop count هم‌زمان فعال شوند؛ ناسازگار�
 
 ## آزمون عملیاتی
 
-1. endpoint کامل و محرمانه shared service را از پنل MeliPayamak دریافت و body ID تأییدشده `561397` را تنظیم کنید.
+1. endpoint کامل و محرمانه shared service را از پنل MeliPayamak دریافت و body ID تأییدشده `561397` را تنظیم کنید. startup موفق فقط اعتبارسنجی config است.
 2. migration `0017_glorious_gravity.sql` را پس از کل زنجیره قبلی و بازبینی دستی اجرا کنید.
 3. متغیرها را فقط در secretهای Runflare تنظیم، تعداد proxy hop را با زیرساخت تأیید و deployment را restart کنید.
-4. برای شماره‌های کنترل‌شده، ورود موبایلی Employer و Candidate و سپس Admin از قبل ایجادشده را آزمایش کنید.
+4. برای شماره‌های کنترل‌شده، جداگانه بررسی کنید: log با outcome برابر `accepted` (پذیرش API)، وضعیت delivery همان `recId` در پنل (تحویل handset)، و در پایان verification موفق OTP. سپس ورود موبایلی Employer و Candidate و Admin از قبل ایجادشده را آزمایش کنید.
 5. cooldown یک‌دقیقه‌ای، سهمیه‌های identifier/account/global، circuit breaker، انقضای ده‌دقیقه‌ای، سقف پنج تلاش، یک‌بارمصرف بودن و باطل شدن کد قدیمی پس از resend را بررسی کنید؛ IP فقط پس از تأیید ingress آزموده شود.
 6. لاگ‌ها و bundle مرورگر را از نبود شماره، IP، OTP و endpoint بازبینی کنید.
 

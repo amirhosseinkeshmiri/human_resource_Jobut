@@ -35,6 +35,7 @@ export function resolveVerificationDeliveryMode(
 export async function deliverVerificationCode(
   identifier: AuthIdentifier,
   verificationCode: string,
+  diagnosticContext?: { correlationId?: string },
 ): Promise<{ developmentCode?: string }> {
   const mode = resolveVerificationDeliveryMode(identifier);
   if (mode === "development") {
@@ -60,7 +61,13 @@ export async function deliverVerificationCode(
   }
 
   try {
-    await sendMeliPayamakOtp(identifier.value, verificationCode);
+    await sendMeliPayamakOtp(
+      identifier.value,
+      verificationCode,
+      fetch,
+      process.env,
+      diagnosticContext?.correlationId,
+    );
     return {};
   } catch (error) {
     try {
