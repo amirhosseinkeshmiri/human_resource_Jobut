@@ -133,6 +133,12 @@ test("pagination URLs preserve all active filters", () => {
   assert.equal(buildPublicJobsHref(filters, 1).includes("page="), false);
 });
 
+test("a selected Iranian city remains stable in parsing and URL serialization", () => {
+  const filters = parsePublicJobFilters({ location: "بندرعباس" });
+  assert.equal(filters.location, "بندرعباس");
+  assert.equal(buildPublicJobsHref(filters, 1), "/jobs?location=%D8%A8%D9%86%D8%AF%D8%B1%D8%B9%D8%A8%D8%A7%D8%B3");
+});
+
 test("clear filters uses the base public Jobs URL", () => {
   assert.equal(PUBLIC_JOBS_CLEAR_URL, "/jobs");
   assert.equal(buildPublicJobsHref(parsePublicJobFilters({}), 1), "/jobs");

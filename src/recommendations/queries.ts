@@ -26,7 +26,7 @@ function enumMatch(column: SQLWrapper, values: readonly string[]): SQL<boolean> 
 }
 
 function normalizedSqlText(value: SQLWrapper) {
-  return sql<string>`lower(btrim(regexp_replace(regexp_replace(translate(normalize(${value}, NFKC), 'يىك', 'ییک'), '[ـ-ٰٟ]', '', 'g'), '[[:space:]‌‍]+', ' ', 'g')))`;
+  return sql<string>`lower(btrim(regexp_replace(regexp_replace(translate(normalize(${value}, NFKC), 'يىك', 'ییک'), '[ـً-ٰٟ]', '', 'g'), '[[:space:]‌‍]+', ' ', 'g')))`;
 }
 
 export type CandidateRecommendationProfile = NonNullable<Awaited<ReturnType<typeof getCandidateRecommendationProfile>>>;

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { PublicJobCard } from "@/components/jobs/public-job-card";
+import { IranCityCombobox } from "@/components/jobs/iran-city-combobox";
 import { PublicFooter } from "@/components/landing/public-footer";
 import { PublicHeader } from "@/components/landing/public-header";
 import { Button, Card, Container, FormField, Input, Select, buttonClassNames } from "@/components/ui";
@@ -9,7 +10,6 @@ import {
   buildPublicJobsHref,
   hasPublicJobFilters,
   parsePublicJobFilters,
-  PUBLIC_JOB_LOCATION_MAX_LENGTH,
   PUBLIC_JOB_QUERY_MAX_LENGTH,
   PUBLIC_JOB_SALARY_MAX,
   PUBLIC_JOBS_CLEAR_URL,
@@ -65,56 +65,52 @@ export default async function PublicJobsPage({ searchParams }: PageProps) {
         <Container className="py-[var(--section-spacing)]">
           {applicationOutcome === "unavailable" ? <p role="alert" className="mb-5 rounded-md border border-warning/30 bg-warning/5 p-3 text-sm font-semibold text-warning">این فرصت شغلی دیگر برای ارسال درخواست در دسترس نیست.</p> : null}
           {applicationOutcome === "invalid" ? <p role="alert" className="mb-5 rounded-md border border-danger/30 bg-danger/5 p-3 text-sm font-semibold text-danger">درخواست ارسال‌شده معتبر نبود. لطفاً فرصت شغلی را دوباره انتخاب کنید.</p> : null}
-          <Card className="shadow-none">
-            <form action="/jobs" method="get" className="grid gap-4 lg:grid-cols-5 lg:items-end">
-              <FormField id="job-search-q" label="عنوان آگهی یا نام شرکت" className="lg:col-span-2">
-                <Input name="q" type="search" maxLength={PUBLIC_JOB_QUERY_MAX_LENGTH} defaultValue={filters.q} placeholder="مثلاً توسعه‌دهنده فرانت‌اند" />
-              </FormField>
-              <FormField id="job-search-location" label="شهر">
-                <Input name="location" maxLength={PUBLIC_JOB_LOCATION_MAX_LENGTH} defaultValue={filters.location} placeholder="مثلاً تهران" />
-              </FormField>
-              <FormField id="job-search-workplace" label="نوع حضور">
-                <Select name="workplace" defaultValue={filters.workplace ?? ""}>
-                  <option value="">همه</option>
-                  {workplaceTypes.map((value) => <option key={value} value={value}>{workplaceTypeLabels[value]}</option>)}
-                </Select>
-              </FormField>
-              <FormField id="job-search-employment" label="نوع همکاری">
-                <Select name="employment" defaultValue={filters.employment ?? ""}>
-                  <option value="">همه</option>
-                  {employmentTypes.map((value) => <option key={value} value={value}>{employmentTypeLabels[value]}</option>)}
-                </Select>
-              </FormField>
-              <FormField id="job-search-seniority" label="سطح ارشدیت">
-                <Select name="seniority" defaultValue={filters.seniority ?? ""}>
-                  <option value="">همه</option>
-                  {seniorityLevels.map((value) => <option key={value} value={value}>{seniorityLevelLabels[value]}</option>)}
-                </Select>
-              </FormField>
-              <FormField id="job-search-salary-type" label="نوع حقوق">
-                <Select name="salaryType" defaultValue={filters.salaryType ?? ""}>
-                  <option value="">همه</option>
-                  <option value="fixed">بازه حقوق مشخص</option>
-                  <option value="negotiable">حقوق توافقی</option>
-                </Select>
-              </FormField>
-              <FormField id="job-search-min-salary" label="حداقل حقوق موردنظر" hint="تومان؛ آگهی‌های توافقی در فیلتر عددی نمایش داده نمی‌شوند.">
-                <Input name="minSalary" type="number" inputMode="numeric" min={0} max={PUBLIC_JOB_SALARY_MAX} step={1} defaultValue={filters.minSalary ?? ""} placeholder="مثلاً ۲۰۰۰۰۰۰۰" dir="ltr" />
-              </FormField>
-              <FormField id="job-search-sort" label="مرتب‌سازی">
-                <Select name="sort" defaultValue={filters.sort}>
-                  <option value="newest">جدیدترین</option>
-                  <option value="oldest">قدیمی‌ترین</option>
-                  <option value="salary_asc">حقوق از کم به زیاد</option>
-                  <option value="salary_desc">حقوق از زیاد به کم</option>
-                </Select>
-              </FormField>
-              <div className="flex flex-col gap-2 sm:flex-row lg:col-span-2">
-                <Button type="submit" className="w-full sm:w-auto">جست‌وجوی فرصت‌ها</Button>
-                {filtered ? <Link href={PUBLIC_JOBS_CLEAR_URL} className={buttonClassNames({ variant: "secondary", className: "w-full sm:w-auto" })}>پاک کردن فیلترها</Link> : null}
+          <Card className="relative overflow-visible border-action/10 p-0 shadow-[0_12px_36px_rgb(20_33_145/0.07)]">
+            <div className="flex flex-col gap-3 border-b border-ui-border px-4 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+              <div><h2 className="text-card-title">جست‌وجوی فرصت شغلی</h2><p className="text-secondary mt-1">عنوان، شرکت یا شرایط همکاری دلخواهتان را انتخاب کنید.</p></div>
+              {filtered ? <span className="w-fit rounded-full bg-action/8 px-3 py-1.5 text-xs font-semibold text-action">فیلتر فعال است</span> : null}
+            </div>
+            <form action="/jobs" method="get">
+              <fieldset className="grid min-w-0 gap-4 px-4 py-5 sm:grid-cols-2 sm:px-6 lg:grid-cols-12">
+                <legend className="sr-only">جست‌وجوی اصلی فرصت‌های شغلی</legend>
+                <FormField id="job-search-q" label="عنوان شغل یا نام شرکت" className="min-w-0 sm:col-span-2 lg:col-span-7">
+                  <Input name="q" type="search" maxLength={PUBLIC_JOB_QUERY_MAX_LENGTH} defaultValue={filters.q} placeholder="مثلاً توسعه‌دهنده فرانت‌اند یا نام شرکت" />
+                </FormField>
+                <FormField id="job-search-location" label="شهر" hint="نام شهر یا استان را بنویسید و از فهرست انتخاب کنید." className="min-w-0 sm:col-span-2 lg:col-span-5">
+                  <IranCityCombobox name="location" defaultValue={filters.location} />
+                </FormField>
+              </fieldset>
+
+              <fieldset className="grid min-w-0 gap-4 border-t border-ui-border bg-surface-elevated/55 px-4 py-5 sm:grid-cols-2 sm:px-6 lg:grid-cols-3">
+                <legend className="sr-only">فیلترهای تکمیلی فرصت شغلی</legend>
+                <FormField id="job-search-workplace" label="نحوه حضور">
+                  <Select name="workplace" defaultValue={filters.workplace ?? ""}><option value="">همه شیوه‌های حضور</option>{workplaceTypes.map((value) => <option key={value} value={value}>{workplaceTypeLabels[value]}</option>)}</Select>
+                </FormField>
+                <FormField id="job-search-employment" label="نوع همکاری">
+                  <Select name="employment" defaultValue={filters.employment ?? ""}><option value="">همه انواع همکاری</option>{employmentTypes.map((value) => <option key={value} value={value}>{employmentTypeLabels[value]}</option>)}</Select>
+                </FormField>
+                <FormField id="job-search-seniority" label="سطح ارشدیت">
+                  <Select name="seniority" defaultValue={filters.seniority ?? ""}><option value="">همه سطوح</option>{seniorityLevels.map((value) => <option key={value} value={value}>{seniorityLevelLabels[value]}</option>)}</Select>
+                </FormField>
+                <FormField id="job-search-salary-type" label="شیوه اعلام حقوق">
+                  <Select name="salaryType" defaultValue={filters.salaryType ?? ""}><option value="">همه آگهی‌ها</option><option value="fixed">بازه حقوق مشخص</option><option value="negotiable">حقوق توافقی</option></Select>
+                </FormField>
+                <FormField id="job-search-min-salary" label="حداقل حقوق موردنظر" hint="مبلغ به تومان؛ آگهی توافقی در فیلتر عددی نمی‌آید.">
+                  <Input name="minSalary" type="number" inputMode="numeric" min={0} max={PUBLIC_JOB_SALARY_MAX} step={1} defaultValue={filters.minSalary ?? ""} placeholder="مثلاً ۲۰۰۰۰۰۰۰" dir="ltr" />
+                </FormField>
+                <FormField id="job-search-sort" label="مرتب‌سازی نتایج">
+                  <Select name="sort" defaultValue={filters.sort}><option value="newest">جدیدترین فرصت‌ها</option><option value="oldest">قدیمی‌ترین فرصت‌ها</option><option value="salary_asc">حقوق از کم به زیاد</option><option value="salary_desc">حقوق از زیاد به کم</option></Select>
+                </FormField>
+              </fieldset>
+
+              <div className="flex flex-col gap-4 border-t border-ui-border px-4 py-5 sm:px-6 lg:flex-row lg:items-center lg:justify-between">
+                <p className="text-helper max-w-3xl">حداقل حقوق بر اساس سقف بازه آگهی سنجیده می‌شود. در مرتب‌سازی حقوق، آگهی‌های توافقی پس از بازه‌های عددی قرار می‌گیرند.</p>
+                <div className="flex shrink-0 flex-col-reverse gap-2 sm:flex-row">
+                  {filtered ? <Link href={PUBLIC_JOBS_CLEAR_URL} className={buttonClassNames({ variant: "secondary", size: "large", className: "w-full sm:w-auto" })}>پاک کردن همه فیلترها</Link> : null}
+                  <Button type="submit" size="large" className="w-full px-7 sm:w-auto">نمایش فرصت‌های شغلی</Button>
+                </div>
               </div>
             </form>
-            <p className="text-helper mt-4">فیلتر حداقل حقوق، آگهی‌هایی را نشان می‌دهد که سقف بازه آن‌ها حداقل به مبلغ انتخابی می‌رسد. مرتب‌سازی حقوق بر اساس ابتدای بازه و سپس انتهای بازه است و آگهی‌های توافقی در انتهای فهرست قرار می‌گیرند.</p>
           </Card>
 
           <div className="mt-7 flex flex-wrap items-center justify-between gap-3">

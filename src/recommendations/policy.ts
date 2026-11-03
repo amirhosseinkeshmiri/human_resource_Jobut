@@ -53,7 +53,7 @@ export function normalizeRecommendationText(value: string) {
     .normalize("NFKC")
     .replace(/[يى]/g, "ی")
     .replace(/ك/g, "ک")
-    .replace(/[\u0640-\u065f\u0670]/g, "")
+    .replace(/[\u0640\u064b-\u065f\u0670]/g, "")
     .replace(/[\u200c\u200d]/g, " ")
     .trim()
     .replace(/\s+/g, " ")
