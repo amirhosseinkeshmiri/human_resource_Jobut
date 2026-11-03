@@ -44,6 +44,20 @@ test("location uses normalized exact matching", () => {
   assert.equal(matchesPublicJobFilters(job, parsePublicJobFilters({ location: "تهر" })), false);
 });
 
+test("province is validated and a mismatched city is never submitted", () => {
+  const valid = parsePublicJobFilters({ province: "تهران", location: "تهران" });
+  assert.equal(valid.province, "تهران");
+  assert.equal(valid.location, "تهران");
+
+  const mismatched = parsePublicJobFilters({ province: "تهران", location: "شیراز" });
+  assert.equal(mismatched.province, "تهران");
+  assert.equal(mismatched.location, "");
+
+  const invalidProvince = parsePublicJobFilters({ province: "ساختگی", location: "شیراز" });
+  assert.equal(invalidProvince.province, "");
+  assert.equal(invalidProvince.location, "شیراز");
+});
+
 test("all approved workplace filters parse and match exactly", () => {
   assert.equal(parsePublicJobFilters({ workplace: "onsite" }).workplace, "onsite");
   assert.equal(parsePublicJobFilters({ workplace: "remote" }).workplace, "remote");
@@ -133,10 +147,22 @@ test("pagination URLs preserve all active filters", () => {
   assert.equal(buildPublicJobsHref(filters, 1).includes("page="), false);
 });
 
+test("province and city URL state survives pagination", () => {
+  const filters = parsePublicJobFilters({ province: "فارس", location: "شیراز" });
+  assert.equal(buildPublicJobsHref(filters, 3), "/jobs?province=%D9%81%D8%A7%D8%B1%D8%B3&location=%D8%B4%DB%8C%D8%B1%D8%A7%D8%B2&page=3");
+});
+
 test("a selected Iranian city remains stable in parsing and URL serialization", () => {
   const filters = parsePublicJobFilters({ location: "بندرعباس" });
   assert.equal(filters.location, "بندرعباس");
   assert.equal(buildPublicJobsHref(filters, 1), "/jobs?location=%D8%A8%D9%86%D8%AF%D8%B1%D8%B9%D8%A8%D8%A7%D8%B3");
+});
+
+test("legacy location-only URLs remain backward compatible", () => {
+  const filters = parsePublicJobFilters({ location: "تهران", page: "2" });
+  assert.equal(filters.province, "");
+  assert.equal(filters.location, "تهران");
+  assert.equal(buildPublicJobsHref(filters, filters.page), "/jobs?location=%D8%AA%D9%87%D8%B1%D8%A7%D9%86&page=2");
 });
 
 test("clear filters uses the base public Jobs URL", () => {

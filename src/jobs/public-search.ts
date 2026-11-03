@@ -1,4 +1,5 @@
 import { employmentTypes, seniorityLevels, workplaceTypes } from "./validation";
+import { isIranProvince, sanitizeIranProvinceCity } from "@/lib/iran-cities";
 
 export const PUBLIC_JOBS_PAGE_SIZE = 20;
 export const PUBLIC_JOB_QUERY_MAX_LENGTH = 120;
@@ -13,6 +14,7 @@ type SearchParamValue = string | string[] | undefined;
 
 export interface PublicJobSearchParams {
   q?: SearchParamValue;
+  province?: SearchParamValue;
   location?: SearchParamValue;
   workplace?: SearchParamValue;
   employment?: SearchParamValue;
@@ -25,6 +27,7 @@ export interface PublicJobSearchParams {
 
 export interface PublicJobFilters {
   q: string;
+  province: string;
   location: string;
   workplace: (typeof workplaceTypes)[number] | null;
   employment: (typeof employmentTypes)[number] | null;
@@ -61,9 +64,15 @@ export function parsePublicJobFilters(params: PublicJobSearchParams): PublicJobF
   const parsedPage = rawPage && /^\d+$/.test(rawPage) ? Number(rawPage) : 1;
 
   const salaryType = enumValue(params.salaryType, publicJobSalaryTypes);
+  const rawProvince = boundedText(params.province, PUBLIC_JOB_LOCATION_MAX_LENGTH);
+  const locationSelection = sanitizeIranProvinceCity(
+    isIranProvince(rawProvince) ? rawProvince : "",
+    boundedText(params.location, PUBLIC_JOB_LOCATION_MAX_LENGTH),
+  );
   return {
     q: boundedText(params.q, PUBLIC_JOB_QUERY_MAX_LENGTH),
-    location: boundedText(params.location, PUBLIC_JOB_LOCATION_MAX_LENGTH),
+    province: locationSelection.province,
+    location: locationSelection.city,
     workplace: enumValue(params.workplace, workplaceTypes),
     employment: enumValue(params.employment, employmentTypes),
     seniority: enumValue(params.seniority, seniorityLevels),
@@ -75,12 +84,13 @@ export function parsePublicJobFilters(params: PublicJobSearchParams): PublicJobF
 }
 
 export function hasPublicJobFilters(filters: PublicJobFilters) {
-  return Boolean(filters.q || filters.location || filters.workplace || filters.employment || filters.seniority || filters.salaryType || filters.minSalary !== null || filters.sort !== "newest");
+  return Boolean(filters.q || filters.province || filters.location || filters.workplace || filters.employment || filters.seniority || filters.salaryType || filters.minSalary !== null || filters.sort !== "newest");
 }
 
 export function buildPublicJobsHref(filters: PublicJobFilters, page: number) {
   const params = new URLSearchParams();
   if (filters.q) params.set("q", filters.q);
+  if (filters.province) params.set("province", filters.province);
   if (filters.location) params.set("location", filters.location);
   if (filters.workplace) params.set("workplace", filters.workplace);
   if (filters.employment) params.set("employment", filters.employment);

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { PublicJobCard } from "@/components/jobs/public-job-card";
-import { IranCityCombobox } from "@/components/jobs/iran-city-combobox";
+import { IranProvinceCityFields } from "@/components/jobs/iran-province-city-fields";
 import { PublicFooter } from "@/components/landing/public-footer";
 import { PublicHeader } from "@/components/landing/public-header";
 import { Button, Card, Container, FormField, Input, Select, buttonClassNames } from "@/components/ui";
@@ -73,12 +73,10 @@ export default async function PublicJobsPage({ searchParams }: PageProps) {
             <form action="/jobs" method="get">
               <fieldset className="grid min-w-0 gap-4 px-4 py-5 sm:grid-cols-2 sm:px-6 lg:grid-cols-12">
                 <legend className="sr-only">جست‌وجوی اصلی فرصت‌های شغلی</legend>
-                <FormField id="job-search-q" label="عنوان شغل یا نام شرکت" className="min-w-0 sm:col-span-2 lg:col-span-7">
+                <FormField id="job-search-q" label="عنوان شغل یا نام شرکت" className="min-w-0 sm:col-span-2 lg:col-span-5">
                   <Input name="q" type="search" maxLength={PUBLIC_JOB_QUERY_MAX_LENGTH} defaultValue={filters.q} placeholder="مثلاً توسعه‌دهنده فرانت‌اند یا نام شرکت" />
                 </FormField>
-                <FormField id="job-search-location" label="شهر" hint="نام شهر یا استان را بنویسید و از فهرست انتخاب کنید." className="min-w-0 sm:col-span-2 lg:col-span-5">
-                  <IranCityCombobox name="location" defaultValue={filters.location} />
-                </FormField>
+                <IranProvinceCityFields defaultProvince={filters.province} defaultCity={filters.location} className="sm:col-span-2 lg:col-span-7" />
               </fieldset>
 
               <fieldset className="grid min-w-0 gap-4 border-t border-ui-border bg-surface-elevated/55 px-4 py-5 sm:grid-cols-2 sm:px-6 lg:grid-cols-3">
