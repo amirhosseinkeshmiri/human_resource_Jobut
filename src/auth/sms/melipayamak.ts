@@ -24,10 +24,17 @@ export type SmsProviderFailureCategory =
   | "insufficient_credit"
   | "rejected";
 
+type SmsProviderResponseSignal =
+  | "status_nonempty_rec_id_positive"
+  | "status_nonempty_rec_id_nonpositive"
+  | "status_nonempty_rec_id_missing_or_invalid"
+  | "status_empty_rec_id_nonpositive";
+
 export class SmsProviderError extends Error {
   constructor(
     public readonly category: SmsProviderFailureCategory,
     public readonly providerCode?: string,
+    public readonly providerSignal?: SmsProviderResponseSignal,
   ) {
     super(category);
     this.name = "SmsProviderError";
@@ -115,6 +122,10 @@ function rejectionCategory(recId: number): SmsProviderFailureCategory {
   return "rejected";
 }
 
+function safeRejectionCode(recId: number) {
+  return [0, 2, -4, -5].includes(recId) ? `rec_id_${recId}` : undefined;
+}
+
 function parseProviderInteger(value: unknown) {
   if (typeof value === "number" && Number.isSafeInteger(value)) return value;
   if (typeof value !== "string" || !/^-?[0-9]+$/.test(value)) return null;
@@ -146,6 +157,7 @@ function logProviderAttempt(input: {
     ...(input.error ? {
       errorCategory: input.error.category,
       ...(input.error.providerCode ? { providerCode: input.error.providerCode } : {}),
+      ...(input.error.providerSignal ? { providerSignal: input.error.providerSignal } : {}),
     } : {}),
     durationMs: Math.max(0, Date.now() - input.startedAt),
   });
@@ -254,10 +266,21 @@ export async function sendMeliPayamakOtp(
     if (status.trim() !== "") {
       const responseRecId = (body as { recId?: unknown }).recId;
       const parsedRecId = parseProviderInteger(responseRecId);
-      const error = config.mode === "shared_template" &&
-          parsedRecId !== null
-        ? new SmsProviderError(rejectionCategory(parsedRecId), `rec_id_${parsedRecId}`)
-        : new SmsProviderError("rejected");
+      const error = config.mode !== "shared_template"
+        ? new SmsProviderError("rejected")
+        : parsedRecId !== null
+          ? new SmsProviderError(
+              rejectionCategory(parsedRecId),
+              safeRejectionCode(parsedRecId),
+              parsedRecId > 0
+                ? "status_nonempty_rec_id_positive"
+                : "status_nonempty_rec_id_nonpositive",
+            )
+          : new SmsProviderError(
+              "rejected",
+              undefined,
+              "status_nonempty_rec_id_missing_or_invalid",
+            );
       logProviderAttempt({ correlationId, outcome: "rejected", startedAt, error, sendingMode });
       throw error;
     }
@@ -280,7 +303,8 @@ export async function sendMeliPayamakOtp(
       if (rejectedRecId === null) throw new SmsProviderError("invalid_response");
       const error = new SmsProviderError(
         rejectionCategory(rejectedRecId),
-        `rec_id_${rejectedRecId}`,
+        safeRejectionCode(rejectedRecId),
+        "status_empty_rec_id_nonpositive",
       );
       logProviderAttempt({ correlationId, outcome: "rejected", startedAt, error, sendingMode });
       throw error;

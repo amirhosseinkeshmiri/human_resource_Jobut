@@ -293,6 +293,58 @@ test("documented shared-service error recIds are rejected and categorized", asyn
   );
 });
 
+test("shared-template rejection logs only bounded response-shape diagnostics", async () => {
+  const originalError = console.error;
+  const entries: string[] = [];
+  console.error = (value?: unknown) => { entries.push(String(value)); };
+  try {
+    for (const response of [
+      { recId: "3741437414", status: "raw provider rejection text" },
+      { recId: -1, status: "another raw rejection" },
+      { status: "credential or template detail" },
+      { recId: -1, status: "" },
+    ]) {
+      await assert.rejects(
+        sendMeliPayamakOtp(
+          "+989121234567",
+          "654321",
+          (async () => Response.json(response)) as typeof fetch,
+          providerEnvironment,
+          "00000000-0000-4000-8000-000000000007",
+        ),
+      );
+    }
+  } finally {
+    console.error = originalError;
+  }
+
+  const attempts = entries
+    .map((entry) => JSON.parse(entry) as Record<string, unknown>)
+    .filter((entry) => entry.event === "sms_provider_attempt");
+  assert.deepEqual(
+    attempts.map((entry) => entry.providerSignal),
+    [
+      "status_nonempty_rec_id_positive",
+      "status_nonempty_rec_id_nonpositive",
+      "status_nonempty_rec_id_missing_or_invalid",
+      "status_empty_rec_id_nonpositive",
+    ],
+  );
+  const serialized = JSON.stringify(entries);
+  for (const sensitive of [
+    "3741437414",
+    "raw provider rejection text",
+    "another raw rejection",
+    "credential or template detail",
+    "654321",
+    "+989121234567",
+    "09121234567",
+    endpoint,
+  ]) {
+    assert.equal(serialized.includes(sensitive), false);
+  }
+});
+
 test("provider failures, redirects, and bounded responses fail safely without retry", async () => {
   for (const [implementation, category] of [
     [(async () => new Response("failure", { status: 500 })) as typeof fetch, "http"],
