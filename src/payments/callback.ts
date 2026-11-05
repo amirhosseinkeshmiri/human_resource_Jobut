@@ -7,10 +7,18 @@ import {
   evaluateCallbackCandidate,
   type SepCallbackFields,
 } from "./policy";
-import { SepProviderError, verifySepTransaction } from "./sep/adapter";
+import {
+  SepProviderError,
+  verifySepTransaction,
+  type SepFailureCategory,
+} from "./sep/adapter";
 import type { SepConfig } from "./sep/config";
 
-export type CallbackResult = "success" | "canceled" | "failed" | "invalid";
+export type CallbackResult = "success" | "canceled" | "failed" | "invalid" | "review";
+
+export function isDefinitiveVerificationFailure(category: SepFailureCategory) {
+  return category === "provider_rejected";
+}
 
 async function markAttemptFailed(
   attemptId: string,
@@ -25,7 +33,28 @@ async function markAttemptFailed(
     .where(and(eq(paymentAttempts.id, attemptId), ne(paymentAttempts.status, "verified")));
 }
 
-export async function processSepCallback(fields: SepCallbackFields, config: SepConfig) {
+async function markAttemptForReconciliation(
+  attemptId: string,
+  gatewayState: string | null,
+  failureCategory: string,
+) {
+  await db
+    .update(paymentAttempts)
+    .set({
+      status: "reconciliation_required",
+      gatewayState,
+      failureCategory,
+      failedAt: null,
+      updatedAt: new Date(),
+    })
+    .where(and(eq(paymentAttempts.id, attemptId), ne(paymentAttempts.status, "verified")));
+}
+
+export async function processSepCallback(
+  fields: SepCallbackFields,
+  config: SepConfig,
+  verifyTransaction: typeof verifySepTransaction = verifySepTransaction,
+) {
   if (!fields.resNum) return { result: "invalid" as CallbackResult, purchaseId: null };
 
   const [attempt] = await db
@@ -34,6 +63,7 @@ export async function processSepCallback(fields: SepCallbackFields, config: SepC
       packagePurchaseId: paymentAttempts.packagePurchaseId,
       status: paymentAttempts.status,
       amountRial: paymentAttempts.amountRial,
+      failureCategory: paymentAttempts.failureCategory,
     })
     .from(paymentAttempts)
     .where(eq(paymentAttempts.resNum, fields.resNum))
@@ -42,9 +72,15 @@ export async function processSepCallback(fields: SepCallbackFields, config: SepC
   if (!attempt) return { result: "invalid" as CallbackResult, purchaseId: null };
   const candidate = evaluateCallbackCandidate(attempt, fields);
   if (candidate.kind === "already_verified") {
-    return { result: "success" as CallbackResult, purchaseId: attempt.packagePurchaseId };
+    return {
+      result: attempt.failureCategory === "duplicate_settlement" ? "review" : "success" as CallbackResult,
+      purchaseId: attempt.packagePurchaseId,
+    };
   }
   if (candidate.kind === "non_ok") {
+    if (attempt.status === "reconciliation_required") {
+      return { result: "review" as CallbackResult, purchaseId: attempt.packagePurchaseId };
+    }
     const status = candidate.status;
     await markAttemptFailed(attempt.id, status, fields.state, `callback_${status}`);
     return {
@@ -54,17 +90,21 @@ export async function processSepCallback(fields: SepCallbackFields, config: SepC
   }
 
   if (candidate.kind === "invalid") {
-    await markAttemptFailed(attempt.id, "failed", fields.state, "callback_invalid");
-    return { result: "invalid" as CallbackResult, purchaseId: attempt.packagePurchaseId };
+    await markAttemptForReconciliation(attempt.id, fields.state, "callback_uncertain");
+    return { result: "review" as CallbackResult, purchaseId: attempt.packagePurchaseId };
   }
   const { amount: callbackAmount, refNum } = candidate;
 
   try {
-    await verifySepTransaction(config, refNum);
+    await verifyTransaction(config, refNum);
   } catch (error) {
     const category = error instanceof SepProviderError ? error.category : "provider_invalid_response";
-    await markAttemptFailed(attempt.id, "failed", fields.state, category);
-    return { result: "failed" as CallbackResult, purchaseId: attempt.packagePurchaseId };
+    if (isDefinitiveVerificationFailure(category)) {
+      await markAttemptFailed(attempt.id, "failed", fields.state, category);
+      return { result: "failed" as CallbackResult, purchaseId: attempt.packagePurchaseId };
+    }
+    await markAttemptForReconciliation(attempt.id, fields.state, category);
+    return { result: "review" as CallbackResult, purchaseId: attempt.packagePurchaseId };
   }
 
   try {
@@ -100,33 +140,39 @@ export async function processSepCallback(fields: SepCallbackFields, config: SepC
       if (replayed) return "invalid" as const;
 
       const verifiedAt = new Date();
-      await confirmPackagePurchasePaidInTransaction(
+      const allocation = await confirmPackagePurchasePaidInTransaction(
         transaction,
         current.packagePurchaseId,
         verifiedAt,
       );
+      const duplicateSettlement = !allocation.allocated;
       await transaction
         .update(paymentAttempts)
         .set({
           status: "verified",
           refNum,
           gatewayState: fields.state,
-          failureCategory: null,
+          failureCategory: duplicateSettlement ? "duplicate_settlement" : null,
           verifiedAt,
           failedAt: null,
           updatedAt: verifiedAt,
         })
         .where(and(eq(paymentAttempts.id, current.id), ne(paymentAttempts.status, "verified")));
-      return "success" as const;
+      return duplicateSettlement ? "review" as const : "success" as const;
     });
     if (result === "invalid") {
-      await markAttemptFailed(attempt.id, "failed", fields.state, "reference_replay");
+      await markAttemptForReconciliation(
+        attempt.id,
+        fields.state,
+        "reference_or_amount_conflict",
+      );
+      return { result: "review" as CallbackResult, purchaseId: attempt.packagePurchaseId };
     }
     return { result, purchaseId: attempt.packagePurchaseId };
   } catch {
-    await markAttemptFailed(attempt.id, "failed", fields.state, "finalization_failed").catch(
+    await markAttemptForReconciliation(attempt.id, fields.state, "finalization_uncertain").catch(
       () => undefined,
     );
-    return { result: "failed" as CallbackResult, purchaseId: attempt.packagePurchaseId };
+    return { result: "review" as CallbackResult, purchaseId: attempt.packagePurchaseId };
   }
 }

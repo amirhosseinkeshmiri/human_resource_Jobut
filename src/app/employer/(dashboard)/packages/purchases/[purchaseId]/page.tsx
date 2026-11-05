@@ -5,6 +5,8 @@ import { SepPaymentButton } from "@/components/payments/sep-payment-button";
 import { Badge, Card, buttonClassNames } from "@/components/ui";
 import { getEmployerDashboardContext } from "@/dashboard/context";
 import { getCompanyPackagePurchase } from "@/packages/queries";
+import { canStartPaymentForPurchase } from "@/payments/policy";
+import { getPaymentResultMessage } from "@/payments/presentation";
 
 export const metadata: Metadata = { title: "پرداخت بسته آگهی" };
 export const dynamic = "force-dynamic";
@@ -27,14 +29,14 @@ export default async function PaymentPage({ params, searchParams }: PaymentPageP
   if (!purchase) notFound();
 
   const result = typeof query.result === "string" ? query.result : undefined;
-  const resultMessage =
-    purchase.status === "paid"
-      ? "پرداخت تأیید شد و اعتبار بسته به حساب شرکت افزوده شد."
-      : result === "canceled"
-        ? "پرداخت لغو شد. در صورت تمایل دوباره تلاش کنید."
-        : result === "failed" || result === "invalid"
-          ? "پرداخت تأیید نشد. می‌توانید دوباره تلاش کنید."
-          : null;
+  const resultMessage = getPaymentResultMessage({
+    purchaseStatus: purchase.status,
+    hasUnresolvedPaymentAttempt: purchase.hasUnresolvedPaymentAttempt,
+    result: result === "success" || result === "canceled" || result === "failed"
+      || result === "invalid" || result === "review"
+      ? result
+      : undefined,
+  });
 
   return (
     <div className="mx-auto max-w-2xl">
@@ -65,7 +67,9 @@ export default async function PaymentPage({ params, searchParams }: PaymentPageP
         </dl>
 
         <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center">
-          {purchase.status === "pending" ? <SepPaymentButton purchaseId={purchase.id} /> : null}
+          {canStartPaymentForPurchase(purchase.status, purchase.hasUnresolvedPaymentAttempt)
+            ? <SepPaymentButton purchaseId={purchase.id} />
+            : null}
           <Link href="/employer/packages" className={buttonClassNames({ variant: "secondary" })}>
             بازگشت به بسته‌ها
           </Link>

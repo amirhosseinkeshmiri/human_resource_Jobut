@@ -1,7 +1,7 @@
 import "server-only";
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
-import { jobPackages, packagePurchases } from "@/db/schema";
+import { jobPackages, packagePurchases, paymentAttempts } from "@/db/schema";
 import { getRemainingJobCredits } from "@/dashboard/metrics";
 
 export async function getEmployerPackagesPageData(companyId: string) {
@@ -52,5 +52,28 @@ export async function getCompanyPackagePurchase(companyId: string, purchaseId: s
     )
     .limit(1);
 
-  return purchase ?? null;
+  if (!purchase) return null;
+
+  const [unresolvedAttempt] = purchase.status === "pending"
+    ? await db
+        .select({ status: paymentAttempts.status })
+        .from(paymentAttempts)
+        .where(
+          and(
+            eq(paymentAttempts.packagePurchaseId, purchase.id),
+            inArray(paymentAttempts.status, [
+              "created",
+              "redirect_ready",
+              "reconciliation_required",
+            ]),
+          ),
+        )
+        .orderBy(desc(paymentAttempts.createdAt))
+        .limit(1)
+    : [];
+
+  return {
+    ...purchase,
+    hasUnresolvedPaymentAttempt: Boolean(unresolvedAttempt),
+  };
 }

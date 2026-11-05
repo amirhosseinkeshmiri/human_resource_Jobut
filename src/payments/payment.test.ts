@@ -9,17 +9,20 @@ import {
 import { loadSepConfig } from "./sep/config";
 import {
   callbackFailureStatus,
+  blocksNewPaymentAttempt,
+  canStartPaymentForPurchase,
   canTransitionAttempt,
   evaluateCallbackCandidate,
   isFormContentType,
   isJsonContentType,
-  isRecentActiveAttempt,
   isSameOrigin,
   parseCallbackAmount,
   parseInitiationInput,
   parseSepCallbackForm,
   tomanToRial,
 } from "./policy";
+import { getPaymentResultMessage } from "./presentation";
+import { isDefinitiveVerificationFailure } from "./callback";
 
 const config = loadSepConfig(
   {
@@ -157,11 +160,34 @@ test("payment request boundaries require exact content types and APP_URL origin"
   assert.equal(isSameOrigin("https://evil.example", "https://www.jobut.ir"), false);
 });
 
-test("active-attempt window blocks only recent created or redirect-ready attempts", () => {
-  const now = new Date("2026-10-11T10:00:00Z");
-  assert.equal(isRecentActiveAttempt("created", new Date("2026-10-11T09:50:00Z"), now), true);
-  assert.equal(isRecentActiveAttempt("redirect_ready", new Date("2026-10-11T09:40:00Z"), now), false);
-  assert.equal(isRecentActiveAttempt("failed", new Date("2026-10-11T09:59:00Z"), now), false);
+test("unresolved attempts block retry without assuming a token-expiry window", () => {
+  assert.equal(blocksNewPaymentAttempt("created"), true);
+  assert.equal(blocksNewPaymentAttempt("redirect_ready"), true);
+  assert.equal(blocksNewPaymentAttempt("reconciliation_required"), true);
+  assert.equal(blocksNewPaymentAttempt("failed"), false);
+  assert.equal(blocksNewPaymentAttempt("canceled"), false);
+  assert.equal(blocksNewPaymentAttempt("verified"), false);
+});
+
+test("employer retry and Persian status remain fail-closed while payment is unresolved", () => {
+  assert.equal(canStartPaymentForPurchase("pending", true), false);
+  assert.equal(canStartPaymentForPurchase("pending", false), true);
+  assert.equal(canStartPaymentForPurchase("paid", false), false);
+  assert.equal(
+    getPaymentResultMessage({
+      purchaseStatus: "pending",
+      hasUnresolvedPaymentAttempt: true,
+    }),
+    "وضعیت پرداخت هنوز نهایی نشده است و در حال بررسی است. برای جلوگیری از پرداخت تکراری، فعلاً پرداخت جدیدی انجام ندهید.",
+  );
+  assert.equal(
+    getPaymentResultMessage({
+      purchaseStatus: "paid",
+      hasUnresolvedPaymentAttempt: false,
+      result: "review",
+    }),
+    "وضعیت پرداخت هنوز نهایی نشده است و در حال بررسی است. برای جلوگیری از پرداخت تکراری، فعلاً پرداخت جدیدی انجام ندهید.",
+  );
 });
 
 test("callback parsing is bounded, validates amounts, and VERIFIED is terminal", () => {
@@ -178,6 +204,17 @@ test("callback parsing is bounded, validates amounts, and VERIFIED is terminal",
   assert.equal(callbackFailureStatus("Failed"), "failed");
   assert.equal(canTransitionAttempt("verified", "failed"), false);
   assert.equal(canTransitionAttempt("verified", "verified"), true);
+  assert.equal(canTransitionAttempt("reconciliation_required", "failed"), false);
+  assert.equal(canTransitionAttempt("reconciliation_required", "canceled"), false);
+  assert.equal(canTransitionAttempt("reconciliation_required", "verified"), true);
+});
+
+test("only an explicit provider rejection is a definitive verification failure", () => {
+  assert.equal(isDefinitiveVerificationFailure("provider_rejected"), true);
+  assert.equal(isDefinitiveVerificationFailure("provider_timeout"), false);
+  assert.equal(isDefinitiveVerificationFailure("provider_network"), false);
+  assert.equal(isDefinitiveVerificationFailure("provider_http"), false);
+  assert.equal(isDefinitiveVerificationFailure("provider_invalid_response"), false);
 });
 
 test("callback candidate requires OK, RefNum, and the immutable attempt amount", () => {

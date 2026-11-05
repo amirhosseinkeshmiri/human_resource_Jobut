@@ -210,6 +210,7 @@ export const packagePurchaseStatus = pgEnum("package_purchase_status", ["pending
 export const paymentAttemptStatus = pgEnum("payment_attempt_status", [
   "created",
   "redirect_ready",
+  "reconciliation_required",
   "verified",
   "failed",
   "canceled",

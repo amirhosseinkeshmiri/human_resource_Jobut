@@ -1,0 +1,1 @@
+ALTER TYPE "public"."payment_attempt_status" ADD VALUE 'reconciliation_required' BEFORE 'verified';

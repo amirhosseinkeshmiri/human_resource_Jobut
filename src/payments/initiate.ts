@@ -1,10 +1,10 @@
 import "server-only";
 import { randomUUID } from "node:crypto";
-import { and, eq, gte, inArray, sql } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { packagePurchases, paymentAttempts } from "@/db/schema";
 import { PaymentError } from "./errors";
-import { isRecentActiveAttempt, receiptPath, tomanToRial } from "./policy";
+import { receiptPath, tomanToRial } from "./policy";
 import { buildSepRedirectUrl, requestSepToken, SepProviderError } from "./sep/adapter";
 import type { SepConfig } from "./sep/config";
 
@@ -15,9 +15,10 @@ interface InitiateSepPaymentInput {
   config: SepConfig;
 }
 
-export async function initiateSepPayment(input: InitiateSepPaymentInput) {
-  const now = new Date();
-  const cutoff = new Date(now.getTime() - 15 * 60 * 1000);
+export async function initiateSepPayment(
+  input: InitiateSepPaymentInput,
+  requestToken: typeof requestSepToken = requestSepToken,
+) {
   const attemptId = randomUUID();
 
   const prepared = await db.transaction(async (transaction) => {
@@ -63,24 +64,24 @@ export async function initiateSepPayment(input: InitiateSepPaymentInput) {
     }
 
     const [activeAttempt] = await transaction
-      .select({ status: paymentAttempts.status, createdAt: paymentAttempts.createdAt })
+      .select({ status: paymentAttempts.status })
       .from(paymentAttempts)
       .where(
         and(
           eq(paymentAttempts.packagePurchaseId, purchase.id),
-          inArray(paymentAttempts.status, ["created", "redirect_ready"]),
-          gte(paymentAttempts.createdAt, cutoff),
+          inArray(paymentAttempts.status, [
+            "created",
+            "redirect_ready",
+            "reconciliation_required",
+          ]),
         ),
       )
       .limit(1);
 
-    if (
-      activeAttempt &&
-      isRecentActiveAttempt(activeAttempt.status, activeAttempt.createdAt, now)
-    ) {
+    if (activeAttempt) {
       throw new PaymentError(
-        "ACTIVE_ATTEMPT_EXISTS",
-        "یک تلاش پرداخت فعال است. چند دقیقه دیگر دوباره تلاش کنید.",
+        "PAYMENT_RECONCILIATION_REQUIRED",
+        "وضعیت پرداخت قبلی هنوز نهایی نشده است و در حال بررسی است.",
         409,
       );
     }
@@ -104,7 +105,7 @@ export async function initiateSepPayment(input: InitiateSepPaymentInput) {
   }
 
   try {
-    const token = await requestSepToken(input.config, {
+    const token = await requestToken(input.config, {
       amountRial: prepared.amountRial,
       resNum: prepared.attemptId,
       mobile: input.employerMobile,
@@ -128,9 +129,9 @@ export async function initiateSepPayment(input: InitiateSepPaymentInput) {
     await db
       .update(paymentAttempts)
       .set({
-        status: "failed",
+        status: "reconciliation_required",
         failureCategory: category,
-        failedAt: new Date(),
+        failedAt: null,
         updatedAt: new Date(),
       })
       .where(
@@ -141,11 +142,10 @@ export async function initiateSepPayment(input: InitiateSepPaymentInput) {
       )
       .catch(() => undefined);
 
-    if (error instanceof PaymentError) throw error;
     throw new PaymentError(
-      "SEP_UNAVAILABLE",
-      "اتصال به درگاه پرداخت برقرار نشد. دوباره تلاش کنید.",
-      502,
+      "PAYMENT_RECONCILIATION_REQUIRED",
+      "وضعیت ایجاد پرداخت هنوز نهایی نشده است و در حال بررسی است. فعلاً پرداخت جدیدی انجام ندهید.",
+      409,
     );
   }
 }

@@ -4,6 +4,11 @@ import postgres from "postgres";
 import { endDatabaseConnection } from "../../src/db";
 import { publishJobPost, PublishJobError } from "../../src/jobs/publish";
 import { confirmPackagePurchasePaid } from "../../src/packages/confirm-purchase";
+import { processSepCallback } from "../../src/payments/callback";
+import { PaymentError } from "../../src/payments/errors";
+import { initiateSepPayment } from "../../src/payments/initiate";
+import { SepProviderError } from "../../src/payments/sep/adapter";
+import type { SepConfig } from "../../src/payments/sep/config";
 
 const databaseUrl = process.env.DATABASE_URL;
 const parsedDatabaseUrl = databaseUrl ? new URL(databaseUrl) : null;
@@ -26,7 +31,41 @@ const ids = {
   purchase: "50000000-0000-4000-8000-000000000001",
   firstJob: "60000000-0000-4000-8000-000000000001",
   secondJob: "60000000-0000-4000-8000-000000000002",
+  ambiguousPurchase: "50000000-0000-4000-8000-000000000002",
+  ambiguousAttempt: "70000000-0000-4000-8000-000000000001",
+  concurrentPurchase: "50000000-0000-4000-8000-000000000003",
+  duplicatePurchase: "50000000-0000-4000-8000-000000000004",
+  duplicateAttemptA: "70000000-0000-4000-8000-000000000002",
+  duplicateAttemptB: "70000000-0000-4000-8000-000000000003",
+  outOfOrderPurchase: "50000000-0000-4000-8000-000000000005",
+  outOfOrderAttempt: "70000000-0000-4000-8000-000000000004",
+  replayPurchase: "50000000-0000-4000-8000-000000000006",
+  replayAttemptA: "70000000-0000-4000-8000-000000000005",
+  replayAttemptB: "70000000-0000-4000-8000-000000000006",
 };
+
+const sepConfig: SepConfig = {
+  appUrl: new URL("https://www.jobut.ir"),
+  callbackUrl: new URL("https://www.jobut.ir/api/payments/sep/callback"),
+  terminalId: "integration-terminal",
+};
+
+async function insertPurchase(id: string) {
+  await sql`
+    insert into package_purchases
+      (id, company_id, job_package_id, package_name, job_credits, price_toman, status)
+    values
+      (${id}, ${ids.company}, ${ids.jobPackage}, 'Integration package', 1, 1000, 'pending')
+  `;
+}
+
+async function insertAttempt(id: string, purchaseId: string) {
+  await sql`
+    insert into payment_attempts
+      (id, package_purchase_id, provider, status, amount_rial, res_num)
+    values (${id}, ${purchaseId}, 'SEP', 'redirect_ready', 10000, ${id})
+  `;
+}
 
 before(async () => {
   await sql`truncate table employer_accounts, industries cascade`;
@@ -108,4 +147,194 @@ test("concurrent publications cannot consume the same final credit twice", async
     where company_id = ${ids.company}
   `;
   assert.equal(balance.value, 0);
+});
+
+test("ambiguous verification blocks another payment attempt", async () => {
+  await insertPurchase(ids.ambiguousPurchase);
+  await insertAttempt(ids.ambiguousAttempt, ids.ambiguousPurchase);
+
+  const callback = await processSepCallback(
+    {
+      state: "OK",
+      resNum: ids.ambiguousAttempt,
+      refNum: "ambiguous-provider-reference",
+      amountText: "10000",
+    },
+    sepConfig,
+    async () => { throw new SepProviderError("provider_timeout"); },
+  );
+  assert.equal(callback.result, "review");
+
+  const [attempt] = await sql`
+    select status, failure_category from payment_attempts where id = ${ids.ambiguousAttempt}
+  `;
+  assert.deepEqual(attempt, {
+    status: "reconciliation_required",
+    failure_category: "provider_timeout",
+  });
+
+  await assert.rejects(
+    initiateSepPayment(
+      {
+        purchaseId: ids.ambiguousPurchase,
+        companyId: ids.company,
+        employerMobile: "+989120000001",
+        config: sepConfig,
+      },
+      async () => "must-not-request-a-token",
+    ),
+    (error: unknown) => error instanceof PaymentError
+      && error.code === "PAYMENT_RECONCILIATION_REQUIRED",
+  );
+});
+
+test("parallel initiation creates only one potentially payable attempt", async () => {
+  await insertPurchase(ids.concurrentPurchase);
+  const results = await Promise.allSettled([
+    initiateSepPayment(
+      {
+        purchaseId: ids.concurrentPurchase,
+        companyId: ids.company,
+        employerMobile: null,
+        config: sepConfig,
+      },
+      async () => "integration-token-a",
+    ),
+    initiateSepPayment(
+      {
+        purchaseId: ids.concurrentPurchase,
+        companyId: ids.company,
+        employerMobile: null,
+        config: sepConfig,
+      },
+      async () => "integration-token-b",
+    ),
+  ]);
+  assert.equal(results.filter((result) => result.status === "fulfilled").length, 1);
+  assert.equal(results.filter((result) => result.status === "rejected").length, 1);
+  const [attemptCount] = await sql`
+    select count(*)::int as value from payment_attempts
+    where package_purchase_id = ${ids.concurrentPurchase}
+  `;
+  assert.equal(attemptCount.value, 1);
+});
+
+test("two distinct verified settlements are preserved and credit is allocated once", async () => {
+  await insertPurchase(ids.duplicatePurchase);
+  await insertAttempt(ids.duplicateAttemptA, ids.duplicatePurchase);
+  await insertAttempt(ids.duplicateAttemptB, ids.duplicatePurchase);
+
+  const first = await processSepCallback(
+    {
+      state: "OK",
+      resNum: ids.duplicateAttemptA,
+      refNum: "provider-reference-a",
+      amountText: "10000",
+    },
+    sepConfig,
+    async () => ({ verified: true as const }),
+  );
+  const second = await processSepCallback(
+    {
+      state: "OK",
+      resNum: ids.duplicateAttemptB,
+      refNum: "provider-reference-b",
+      amountText: "10000",
+    },
+    sepConfig,
+    async () => ({ verified: true as const }),
+  );
+  const repeated = await processSepCallback(
+    { state: null, resNum: ids.duplicateAttemptB, refNum: null, amountText: null },
+    sepConfig,
+    async () => { throw new Error("verified callbacks must not reverify"); },
+  );
+
+  assert.equal(first.result, "success");
+  assert.equal(second.result, "review");
+  assert.equal(repeated.result, "review");
+  const attempts = await sql`
+    select status, failure_category from payment_attempts
+    where package_purchase_id = ${ids.duplicatePurchase}
+    order by id
+  `;
+  assert.deepEqual(attempts, [
+    { status: "verified", failure_category: null },
+    { status: "verified", failure_category: "duplicate_settlement" },
+  ]);
+  const allocations = await sql`
+    select amount from company_job_credit_transactions
+    where package_purchase_id = ${ids.duplicatePurchase}
+  `;
+  assert.deepEqual(allocations.map((row) => row.amount), [1]);
+});
+
+test("a late valid OK callback can recover a previously failed attempt", async () => {
+  await insertPurchase(ids.outOfOrderPurchase);
+  await insertAttempt(ids.outOfOrderAttempt, ids.outOfOrderPurchase);
+
+  const failed = await processSepCallback(
+    { state: "Failed", resNum: ids.outOfOrderAttempt, refNum: null, amountText: null },
+    sepConfig,
+  );
+  const recovered = await processSepCallback(
+    {
+      state: "OK",
+      resNum: ids.outOfOrderAttempt,
+      refNum: "late-valid-reference",
+      amountText: "10000",
+    },
+    sepConfig,
+    async () => ({ verified: true as const }),
+  );
+
+  assert.equal(failed.result, "failed");
+  assert.equal(recovered.result, "success");
+  const [attempt] = await sql`
+    select status, ref_num from payment_attempts where id = ${ids.outOfOrderAttempt}
+  `;
+  assert.deepEqual(attempt, { status: "verified", ref_num: "late-valid-reference" });
+});
+
+test("a provider reference cannot be attached to two payment attempts", async () => {
+  await insertPurchase(ids.replayPurchase);
+  await insertAttempt(ids.replayAttemptA, ids.replayPurchase);
+  await insertAttempt(ids.replayAttemptB, ids.replayPurchase);
+  const sharedReference = "replayed-provider-reference";
+
+  const first = await processSepCallback(
+    {
+      state: "OK",
+      resNum: ids.replayAttemptA,
+      refNum: sharedReference,
+      amountText: "10000",
+    },
+    sepConfig,
+    async () => ({ verified: true as const }),
+  );
+  const replay = await processSepCallback(
+    {
+      state: "OK",
+      resNum: ids.replayAttemptB,
+      refNum: sharedReference,
+      amountText: "10000",
+    },
+    sepConfig,
+    async () => ({ verified: true as const }),
+  );
+
+  assert.equal(first.result, "success");
+  assert.equal(replay.result, "review");
+  const attempts = await sql`
+    select status, ref_num, failure_category from payment_attempts
+    where id in (${ids.replayAttemptA}, ${ids.replayAttemptB}) order by id
+  `;
+  assert.deepEqual(attempts, [
+    { status: "verified", ref_num: sharedReference, failure_category: null },
+    {
+      status: "reconciliation_required",
+      ref_num: null,
+      failure_category: "reference_or_amount_conflict",
+    },
+  ]);
 });

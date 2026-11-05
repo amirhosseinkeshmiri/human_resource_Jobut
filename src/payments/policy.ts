@@ -1,6 +1,5 @@
 export const INITIATION_BODY_LIMIT = 2 * 1024;
 export const CALLBACK_BODY_LIMIT = 8 * 1024;
-export const ACTIVE_ATTEMPT_WINDOW_MS = 15 * 60 * 1000;
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const DECIMAL_PATTERN = /^[1-9][0-9]*$/;
@@ -8,6 +7,7 @@ const DECIMAL_PATTERN = /^[1-9][0-9]*$/;
 export type PaymentAttemptStatus =
   | "created"
   | "redirect_ready"
+  | "reconciliation_required"
   | "verified"
   | "failed"
   | "canceled";
@@ -53,19 +53,24 @@ export function isSameOrigin(originHeader: string | null, appOrigin: string) {
   }
 }
 
-export function isRecentActiveAttempt(
-  status: PaymentAttemptStatus,
-  createdAt: Date,
-  now = new Date(),
+export function blocksNewPaymentAttempt(status: PaymentAttemptStatus) {
+  return status === "created"
+    || status === "redirect_ready"
+    || status === "reconciliation_required";
+}
+
+export function canStartPaymentForPurchase(
+  purchaseStatus: "pending" | "paid",
+  hasUnresolvedPaymentAttempt: boolean,
 ) {
-  return (
-    (status === "created" || status === "redirect_ready") &&
-    createdAt.getTime() >= now.getTime() - ACTIVE_ATTEMPT_WINDOW_MS
-  );
+  return purchaseStatus === "pending" && !hasUnresolvedPaymentAttempt;
 }
 
 export function canTransitionAttempt(from: PaymentAttemptStatus, to: PaymentAttemptStatus) {
   if (from === "verified") return to === "verified";
+  if (from === "reconciliation_required") {
+    return to === "reconciliation_required" || to === "verified";
+  }
   return true;
 }
 
@@ -118,7 +123,10 @@ export function evaluateCallbackCandidate(
   return { kind: "verify" as const, refNum: fields.refNum, amount };
 }
 
-export function receiptPath(purchaseId: string, result?: "success" | "canceled" | "failed" | "invalid") {
+export function receiptPath(
+  purchaseId: string,
+  result?: "success" | "canceled" | "failed" | "invalid" | "review",
+) {
   const path = `/employer/packages/purchases/${purchaseId}`;
   return result ? `${path}?result=${result}` : path;
 }
