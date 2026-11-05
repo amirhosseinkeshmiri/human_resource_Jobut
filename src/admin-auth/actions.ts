@@ -188,7 +188,7 @@ export async function verifyAdminCode(
   if (typeof challengeId !== "string" || !/^[0-9a-f-]{36}$/i.test(challengeId)) {
     return { status: "error", message: "درخواست ورود معتبر نیست. دوباره تلاش کنید." };
   }
-  if (!code) return { status: "error", message: "کد ورود باید ۶ رقم باشد." };
+  if (!code) return { status: "error", message: "کد ورود معتبر نیست." };
 
   const session = await db.transaction(async (transaction) => {
     const [challenge] = await transaction

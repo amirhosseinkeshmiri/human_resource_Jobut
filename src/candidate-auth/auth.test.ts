@@ -24,10 +24,12 @@ test("rejects invalid Candidate identifiers", () => {
   assert.equal(normalizeAuthIdentifier("08121234567"), null);
 });
 
-test("accepts only normalized six-digit verification codes", () => {
+test("accepts normalized bounded variable-length verification codes", () => {
   assert.equal(normalizeVerificationCode("۱۲۳۴۵۶"), "123456");
   assert.equal(normalizeVerificationCode("12345"), null);
-  assert.equal(normalizeVerificationCode("1234567"), null);
+  assert.equal(normalizeVerificationCode("1234567"), "1234567");
+  assert.equal(normalizeVerificationCode("1".repeat(32)), "1".repeat(32));
+  assert.equal(normalizeVerificationCode("1".repeat(33)), null);
 });
 
 test("rejects expired and exhausted Candidate challenges", () => {

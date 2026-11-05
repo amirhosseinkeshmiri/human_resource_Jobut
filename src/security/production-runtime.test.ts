@@ -18,6 +18,8 @@ const validEnvironment = {
   SMTP_PORT: "465",
   SMTP_SECURE: "true",
   SMS_PROVIDER: "melipayamak",
+  MELIPAYAMAK_SENDING_MODE: "native_otp",
+  MELIPAYAMAK_OTP_ENDPOINT: "https://console.melipayamak.com/api/send/otp/test-placeholder-secret",
   MELIPAYAMAK_SHARED_ENDPOINT: "https://console.melipayamak.com/api/send/shared/test-secret",
   MELIPAYAMAK_BODY_ID: "561397",
   SMS_TIMEOUT_MS: "5000",
@@ -93,14 +95,29 @@ test("rejects production runtime without SMTP delivery", () => {
 test("rejects missing or invalid MeliPayamak production configuration", () => {
   for (const overrides of [
     { SMS_PROVIDER: "" },
-    { MELIPAYAMAK_SHARED_ENDPOINT: "" },
-    { MELIPAYAMAK_SHARED_ENDPOINT: "https://example.com/api/send/shared/secret" },
-    { MELIPAYAMAK_SHARED_ENDPOINT: "https://console.melipayamak.com/api/send/shared/" },
-    { MELIPAYAMAK_BODY_ID: "0" },
+    { MELIPAYAMAK_SENDING_MODE: "unknown" },
+    { MELIPAYAMAK_OTP_ENDPOINT: "" },
+    { MELIPAYAMAK_OTP_ENDPOINT: "https://example.com/api/send/otp/secret" },
+    { MELIPAYAMAK_OTP_ENDPOINT: "https://console.melipayamak.com/api/send/otp/" },
     { SMS_TIMEOUT_MS: "999" },
   ]) {
     assert.notEqual(verify(overrides).status, 0);
   }
+});
+
+test("native OTP mode does not require shared endpoint or body ID", () => {
+  assert.equal(verify({ MELIPAYAMAK_SHARED_ENDPOINT: "", MELIPAYAMAK_BODY_ID: "" }).status, 0);
+});
+
+test("shared-template mode remains supported and requires its body ID", () => {
+  assert.equal(verify({
+    MELIPAYAMAK_SENDING_MODE: "shared_template",
+    MELIPAYAMAK_OTP_ENDPOINT: "",
+  }).status, 0);
+  assert.notEqual(verify({
+    MELIPAYAMAK_SENDING_MODE: "shared_template",
+    MELIPAYAMAK_BODY_ID: "",
+  }).status, 0);
 });
 
 test("rejects production runtime without a mounted upload directory", () => {

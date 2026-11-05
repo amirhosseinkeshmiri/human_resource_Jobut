@@ -175,7 +175,7 @@ export async function verifyEmployerCode(
   }
 
   if (!code) {
-    return { status: "error", message: "کد ورود باید ۶ رقم باشد." };
+    return { status: "error", message: "کد ورود معتبر نیست." };
   }
 
   const accountContext = await getBrowserAccountContext();

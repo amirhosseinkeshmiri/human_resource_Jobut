@@ -35,7 +35,7 @@ test("missing trusted proxy configuration logs only a safe chain length", async 
         activate: async () => true,
         invalidate: async () => undefined,
       },
-      async () => ({}),
+      async () => ({ verificationCode: "123456" }),
       { correlationId: "00000000-0000-4000-8000-000000000003", provider: "melipayamak" },
     ));
   } finally {
@@ -100,7 +100,7 @@ test("database reserve failure is logged at the pre-delivery stage", async () =>
         activate: async () => true,
         invalidate: async () => undefined,
       },
-      async () => ({}),
+      async () => ({ verificationCode: "123456" }),
       { correlationId: "00000000-0000-4000-8000-000000000002", provider: "melipayamak" },
     ));
   } finally {

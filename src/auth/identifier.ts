@@ -6,6 +6,8 @@ export type EmployerIdentifier = AuthIdentifier;
 
 const persianDigits = "۰۱۲۳۴۵۶۷۸۹";
 const arabicDigits = "٠١٢٣٤٥٦٧٨٩";
+export const MIN_VERIFICATION_CODE_LENGTH = 6;
+export const MAX_VERIFICATION_CODE_LENGTH = 32;
 
 export function toLatinDigits(value: string) {
   return value.replace(/[۰-۹٠-٩]/g, (digit) => {
@@ -36,5 +38,7 @@ export const normalizeEmployerIdentifier = normalizeAuthIdentifier;
 export function normalizeVerificationCode(input: unknown) {
   if (typeof input !== "string") return null;
   const code = toLatinDigits(input.trim());
-  return /^\d{6}$/.test(code) ? code : null;
+  return new RegExp(
+    `^[0-9]{${MIN_VERIFICATION_CODE_LENGTH},${MAX_VERIFICATION_CODE_LENGTH}}$`,
+  ).test(code) ? code : null;
 }

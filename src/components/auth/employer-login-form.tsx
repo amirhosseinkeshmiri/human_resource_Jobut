@@ -9,6 +9,7 @@ import {
   type VerifyCodeState,
 } from "@/auth/actions";
 import { Button, FormField, Input } from "@/components/ui";
+import { MAX_VERIFICATION_CODE_LENGTH, MIN_VERIFICATION_CODE_LENGTH } from "@/auth/identifier";
 
 const initialRequestState: RequestCodeState = { status: "idle" };
 const initialVerifyState: VerifyCodeState = { status: "idle" };
@@ -49,7 +50,7 @@ export function EmployerLoginForm() {
 
         <FormField
           id="code"
-          label="کد شش‌رقمی"
+          label="کد ورود"
           error={verifyState.status === "error" ? verifyState.message : undefined}
         >
           <Input
@@ -57,8 +58,9 @@ export function EmployerLoginForm() {
             type="text"
             inputMode="numeric"
             autoComplete="one-time-code"
-            pattern="[0-9]{6}"
-            maxLength={6}
+            pattern={`[0-9]{${MIN_VERIFICATION_CODE_LENGTH},${MAX_VERIFICATION_CODE_LENGTH}}`}
+            minLength={MIN_VERIFICATION_CODE_LENGTH}
+            maxLength={MAX_VERIFICATION_CODE_LENGTH}
             dir="ltr"
             className="text-center text-lg tracking-[0.35em]"
             invalid={verifyState.status === "error"}

@@ -25,6 +25,12 @@ const providerEnvironment = {
   MELIPAYAMAK_BODY_ID: "561397",
   SMS_TIMEOUT_MS: "5000",
 };
+const nativeEndpoint = "https://console.melipayamak.com/api/send/otp/test-placeholder-secret";
+const nativeEnvironment = {
+  MELIPAYAMAK_SENDING_MODE: "native_otp",
+  MELIPAYAMAK_OTP_ENDPOINT: nativeEndpoint,
+  SMS_TIMEOUT_MS: "5000",
+};
 
 function assertCategory(category: string) {
   return (error: unknown) => error instanceof SmsProviderError && error.category === category;
@@ -43,6 +49,8 @@ test("production provider requires the secret shared endpoint and positive body 
     );
   }
   const config = loadMeliPayamakConfig(providerEnvironment);
+  assert.equal(config.mode, "shared_template");
+  if (config.mode !== "shared_template") assert.fail("expected shared_template config");
   assert.equal(config.endpoint.toString(), endpoint);
   assert.equal(config.bodyId, 561397);
   assert.equal(config.timeoutMs, 5000);
@@ -51,6 +59,8 @@ test("production provider requires the secret shared endpoint and positive body 
     MELIPAYAMAK_SHARED_ENDPOINT: endpoint,
     MELIPAYAMAK_BODY_ID: "561397",
   });
+  assert.equal(configWithoutObsoleteVariables.mode, "shared_template");
+  if (configWithoutObsoleteVariables.mode !== "shared_template") assert.fail("expected shared_template config");
   assert.equal(configWithoutObsoleteVariables.bodyId, 561397);
 });
 
@@ -61,6 +71,23 @@ test("production mobile delivery remains isolated from email and development", (
   assert.equal(resolveVerificationDeliveryMode({ type: "email", value: "user@example.com" }, "production", "melipayamak"), "unavailable");
   assert.equal(resolveVerificationDeliveryMode({ type: "email", value: "user@example.com" }, "production", "melipayamak", "smtp"), "smtp");
   assert.equal(resolveVerificationDeliveryMode(mobile, "development", undefined), "development");
+});
+
+test("native OTP configuration requires only the rotated native endpoint", () => {
+  const config = loadMeliPayamakConfig(nativeEnvironment);
+  assert.deepEqual(config, {
+    mode: "native_otp",
+    endpoint: new URL(nativeEndpoint),
+    timeoutMs: 5000,
+  });
+  assert.throws(
+    () => loadMeliPayamakConfig({ MELIPAYAMAK_SENDING_MODE: "native_otp" }),
+    assertCategory("configuration"),
+  );
+  assert.throws(
+    () => loadMeliPayamakConfig({ ...nativeEnvironment, MELIPAYAMAK_OTP_ENDPOINT: endpoint }),
+    assertCategory("configuration"),
+  );
 });
 
 test("endpoint validation rejects insecure, foreign, credential, query, fragment, and port URLs", () => {
@@ -110,7 +137,7 @@ test("shared-template SMS request uses exact POST JSON and preserves the OTP str
     }) as typeof fetch,
     providerEnvironment,
   );
-  assert.deepEqual(receipt, { recId: 3741437414, status: "" });
+  assert.deepEqual(receipt, { verificationCode: "042731", recId: 3741437414, status: "" });
   assert.equal(calls, 1);
   assert.equal(String(requestInput), endpoint);
   assert.equal(requestInit?.method, "POST");
@@ -123,6 +150,68 @@ test("shared-template SMS request uses exact POST JSON and preserves the OTP str
   assert.equal("from" in body, false);
   assert.equal("text" in body, false);
   assert.equal(JSON.stringify(body).includes("a-development-test-secret-with-32-characters"), false);
+});
+
+test("native OTP sends only the normalized recipient and returns the provider-generated code", async () => {
+  let requestInit: RequestInit | undefined;
+  const receipt = await sendMeliPayamakOtp(
+    "+989121234567",
+    "999999",
+    (async (_input: string | URL | Request, init?: RequestInit) => {
+      requestInit = init;
+      return Response.json({ code: "3741437414", status: "" });
+    }) as typeof fetch,
+    nativeEnvironment,
+  );
+  assert.deepEqual(receipt, { verificationCode: "3741437414", status: "" });
+  assert.deepEqual(JSON.parse(String(requestInit?.body)), { to: "09121234567" });
+  assert.equal(String(requestInit?.body).includes("999999"), false);
+});
+
+test("native OTP rejects invalid canonical mobile numbers before dispatch", async () => {
+  let calls = 0;
+  await assert.rejects(
+    sendMeliPayamakOtp(
+      "09121234567",
+      undefined,
+      (async () => { calls += 1; return Response.json({ code: "3741437414", status: "" }); }) as typeof fetch,
+      nativeEnvironment,
+    ),
+    assertCategory("invalid_response"),
+  );
+  assert.equal(calls, 0);
+});
+
+test("native OTP rejects provider errors and ambiguous or unsafe codes", async () => {
+  for (const [response, category] of [
+    [Response.json({ code: "3741437414", status: "provider rejection" }), "rejected"],
+    [Response.json({ code: "", status: "" }), "invalid_response"],
+    [Response.json({ code: "12345", status: "" }), "invalid_response"],
+    [Response.json({ code: "1".repeat(33), status: "" }), "invalid_response"],
+    [Response.json({ code: "12345A", status: "" }), "invalid_response"],
+    [Response.json({ code: 3741437414, status: "" }), "invalid_response"],
+    [Response.json({ status: "" }), "invalid_response"],
+    [Response.json({ code: "123456" }), "invalid_response"],
+  ] as const) {
+    await assert.rejects(
+      sendMeliPayamakOtp(
+        "+989121234567",
+        undefined,
+        (async () => response) as typeof fetch,
+        nativeEnvironment,
+      ),
+      assertCategory(category),
+    );
+  }
+  for (const code of ["123456", "1234567", "1".repeat(32)]) {
+    const receipt = await sendMeliPayamakOtp(
+      "+989121234567",
+      undefined,
+      (async () => Response.json({ code, status: "" })) as typeof fetch,
+      nativeEnvironment,
+    );
+    assert.equal(receipt.verificationCode, code);
+  }
 });
 
 test("provider response accepts only a positive recId with an empty status", async () => {
@@ -228,6 +317,38 @@ test("provider operation logs structured metadata but no endpoint, recipient, OT
   }
 });
 
+test("native provider logs never contain the returned OTP, endpoint secret, or raw error", async () => {
+  const originalInfo = console.info;
+  const originalError = console.error;
+  const entries: string[] = [];
+  console.info = (value?: unknown) => { entries.push(String(value)); };
+  console.error = (value?: unknown) => { entries.push(String(value)); };
+  try {
+    await sendMeliPayamakOtp(
+      "+989121234567",
+      undefined,
+      (async () => Response.json({ code: "3741437414", status: "" })) as typeof fetch,
+      nativeEnvironment,
+      "00000000-0000-4000-8000-000000000005",
+    );
+    await assert.rejects(sendMeliPayamakOtp(
+      "+989121234567",
+      undefined,
+      (async () => Response.json({ code: "3741437414", status: "credential rejected detail" })) as typeof fetch,
+      nativeEnvironment,
+      "00000000-0000-4000-8000-000000000006",
+    ));
+  } finally {
+    console.info = originalInfo;
+    console.error = originalError;
+  }
+  const serialized = entries.join("\n");
+  assert.equal(serialized.includes("native_otp"), true);
+  for (const sensitive of ["3741437414", "test-placeholder-secret", nativeEndpoint, "09121234567", "credential rejected detail"]) {
+    assert.equal(serialized.includes(sensitive), false);
+  }
+});
+
 test("two-phase challenge hashes locally generated OTP and never persists raw OTP", async () => {
   const secret = "a-development-test-secret-with-32-characters";
   const previousSecret = process.env.AUTH_SECRET;
@@ -243,7 +364,7 @@ test("two-phase challenge hashes locally generated OTP and never persists raw OT
         activate: async (input) => { active = input; return true; },
         invalidate: async () => undefined,
       },
-      async (_identifier, code) => { deliveredCode = code; return {}; },
+      async (_identifier, code) => { deliveredCode = code!; return { verificationCode: code! }; },
     );
     assert.equal(result.challengeId, pending!.id);
     assert.match(deliveredCode, /^[0-9]{6}$/);
@@ -251,6 +372,30 @@ test("two-phase challenge hashes locally generated OTP and never persists raw OT
     assert.equal(active!.codeDigest, digestVerificationCode(active!.id, deliveredCode, secret));
     assert.equal(verificationCodeMatches(active!.codeDigest, digestVerificationCode(active!.id, deliveredCode, secret)), true);
     assert.equal(JSON.stringify({ pending, active }).includes(deliveredCode), false);
+  } finally {
+    if (previousSecret === undefined) delete process.env.AUTH_SECRET;
+    else process.env.AUTH_SECRET = previousSecret;
+  }
+});
+
+test("native OTP challenge hashes the provider code rather than the unused local code", async () => {
+  const secret = "a-development-test-secret-with-32-characters";
+  const previousSecret = process.env.AUTH_SECRET;
+  process.env.AUTH_SECRET = secret;
+  const providerCode = "3741437414";
+  let active: { id: string; codeDigest: string; expiresAt: Date } | null = null;
+  try {
+    await issueVerificationChallenge(
+      { type: "mobile", value: "+989121234567" },
+      {
+        reserve: async () => undefined,
+        activate: async (input) => { active = input; return true; },
+        invalidate: async () => undefined,
+      },
+      async () => ({ verificationCode: providerCode }),
+    );
+    assert.equal(active!.codeDigest, digestVerificationCode(active!.id, providerCode, secret));
+    assert.equal(JSON.stringify(active).includes(providerCode), false);
   } finally {
     if (previousSecret === undefined) delete process.env.AUTH_SECRET;
     else process.env.AUTH_SECRET = previousSecret;
@@ -272,7 +417,7 @@ test("delivery or activation failure invalidates the pending challenge", async (
     await assert.rejects(issueVerificationChallenge(
       { type: "mobile", value: "+989121234567" },
       { reserve: async () => undefined, activate: async () => false, invalidate: async () => { invalidated = true; } },
-      async () => ({}),
+      async () => ({ verificationCode: "123456" }),
     ));
     assert.equal(invalidated, true);
   } finally {
@@ -283,7 +428,7 @@ test("delivery or activation failure invalidates the pending challenge", async (
 
 test("development delivery and resend policy remain unchanged", async () => {
   const delivery = await deliverVerificationCode({ type: "email", value: "user@example.com" }, "042731");
-  assert.deepEqual(delivery, { developmentCode: "042731" });
+  assert.deepEqual(delivery, { developmentCode: "042731", verificationCode: "042731" });
   const now = new Date("2026-10-19T10:00:00Z");
   assert.equal(isWithinVerificationCodeCooldown(new Date("2026-10-19T09:59:30Z"), now), true);
   assert.equal(isWithinVerificationCodeCooldown(new Date("2026-10-19T09:58:59Z"), now), false);

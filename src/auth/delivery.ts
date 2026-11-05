@@ -34,18 +34,20 @@ export function resolveVerificationDeliveryMode(
 
 export async function deliverVerificationCode(
   identifier: AuthIdentifier,
-  verificationCode: string,
+  verificationCode?: string,
   diagnosticContext?: { correlationId?: string },
-): Promise<{ developmentCode?: string }> {
+): Promise<{ developmentCode?: string; verificationCode: string }> {
   const mode = resolveVerificationDeliveryMode(identifier);
   if (mode === "development") {
-    return { developmentCode: verificationCode };
+    if (!verificationCode) throw new VerificationDeliveryError();
+    return { developmentCode: verificationCode, verificationCode };
   }
 
   if (mode === "smtp") {
     try {
+      if (!verificationCode) throw new VerificationDeliveryError();
       await sendSmtpOtp(identifier.value, verificationCode);
-      return {};
+      return { verificationCode };
     } catch (error) {
       try {
         await recordOtpProviderFailure("email");
@@ -61,14 +63,14 @@ export async function deliverVerificationCode(
   }
 
   try {
-    await sendMeliPayamakOtp(
+    const receipt = await sendMeliPayamakOtp(
       identifier.value,
       verificationCode,
       fetch,
       process.env,
       diagnosticContext?.correlationId,
     );
-    return {};
+    return { verificationCode: receipt.verificationCode };
   } catch (error) {
     try {
       await recordOtpProviderFailure("sms");

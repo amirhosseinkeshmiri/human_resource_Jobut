@@ -9,6 +9,7 @@ import {
   type CandidateVerifyCodeState,
 } from "@/candidate-auth/actions";
 import { Button, FormField, Input } from "@/components/ui";
+import { MAX_VERIFICATION_CODE_LENGTH, MIN_VERIFICATION_CODE_LENGTH } from "@/auth/identifier";
 
 const initialRequestState: CandidateRequestCodeState = { status: "idle" };
 const initialVerifyState: CandidateVerifyCodeState = { status: "idle" };
@@ -36,7 +37,7 @@ export function CandidateLoginForm() {
           </div>
         ) : null}
         <FormField id="candidate-code" label="کد تأیید" error={verifyState.status === "error" ? verifyState.message : undefined}>
-          <Input name="code" type="text" inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{6}" maxLength={6} dir="ltr" className="text-center text-lg tracking-[0.35em]" invalid={verifyState.status === "error"} required />
+          <Input name="code" type="text" inputMode="numeric" autoComplete="one-time-code" pattern={`[0-9]{${MIN_VERIFICATION_CODE_LENGTH},${MAX_VERIFICATION_CODE_LENGTH}}`} minLength={MIN_VERIFICATION_CODE_LENGTH} maxLength={MAX_VERIFICATION_CODE_LENGTH} dir="ltr" className="text-center text-lg tracking-[0.35em]" invalid={verifyState.status === "error"} required />
         </FormField>
         <SubmitButton>ورود</SubmitButton>
         <a href="/login/candidate" className="text-center text-sm font-medium text-text-secondary underline-offset-4 hover:text-text-primary hover:underline focus-visible:rounded focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus">ویرایش ایمیل یا شماره موبایل</a>

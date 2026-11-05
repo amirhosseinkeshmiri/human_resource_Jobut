@@ -161,7 +161,7 @@ export async function verifyCandidateCode(
   if (typeof challengeId !== "string" || !/^[0-9a-f-]{36}$/i.test(challengeId)) {
     return { status: "error", message: "درخواست ورود معتبر نیست. دوباره تلاش کنید." };
   }
-  if (!code) return { status: "error", message: "کد ورود باید ۶ رقم باشد." };
+  if (!code) return { status: "error", message: "کد ورود معتبر نیست." };
 
   const accountContext = await getBrowserAccountContext();
   if (accountContext.context === "employer" || accountContext.context === "conflict") {

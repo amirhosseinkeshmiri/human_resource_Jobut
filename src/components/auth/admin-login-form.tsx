@@ -9,6 +9,7 @@ import {
   type AdminVerifyCodeState,
 } from "@/admin-auth/actions";
 import { Button, FormField, Input } from "@/components/ui";
+import { MAX_VERIFICATION_CODE_LENGTH, MIN_VERIFICATION_CODE_LENGTH } from "@/auth/identifier";
 
 const initialRequestState: AdminRequestCodeState = { status: "idle" };
 const initialVerifyState: AdminVerifyCodeState = { status: "idle" };
@@ -33,8 +34,8 @@ export function AdminLoginForm() {
         {requestState.developmentCode ? (
           <div className="rounded-md border border-warning/30 bg-warning/10 p-3 text-sm text-warning">فقط محیط توسعه — کد ورود: <bdi>{requestState.developmentCode}</bdi></div>
         ) : null}
-        <FormField id="admin-code" label="کد شش‌رقمی" error={verifyState.status === "error" ? verifyState.message : undefined}>
-          <Input name="code" type="text" inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{6}" maxLength={6} dir="ltr" className="text-center text-lg tracking-[0.35em]" invalid={verifyState.status === "error"} required />
+        <FormField id="admin-code" label="کد ورود" error={verifyState.status === "error" ? verifyState.message : undefined}>
+          <Input name="code" type="text" inputMode="numeric" autoComplete="one-time-code" pattern={`[0-9]{${MIN_VERIFICATION_CODE_LENGTH},${MAX_VERIFICATION_CODE_LENGTH}}`} minLength={MIN_VERIFICATION_CODE_LENGTH} maxLength={MAX_VERIFICATION_CODE_LENGTH} dir="ltr" className="text-center text-lg tracking-[0.35em]" invalid={verifyState.status === "error"} required />
         </FormField>
         <SubmitButton>ورود به مدیریت</SubmitButton>
         <a href="/admin/login" className="text-center text-sm font-medium text-text-secondary underline-offset-4 hover:text-text-primary hover:underline focus-visible:rounded focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus">ویرایش شناسه ورود</a>

@@ -122,19 +122,29 @@ export function verifyProductionRuntime(environment = process.env) {
   if (environment.SMS_PROVIDER !== "melipayamak") {
     throw new Error("SMS_PROVIDER must be melipayamak in production.");
   }
-  const melipayamakEndpoint = readHttpsUrl(environment, "MELIPAYAMAK_SHARED_ENDPOINT");
+  const melipayamakMode = environment.MELIPAYAMAK_SENDING_MODE || "shared_template";
+  if (!['native_otp', 'shared_template'].includes(melipayamakMode)) {
+    throw new Error("MELIPAYAMAK_SENDING_MODE must be native_otp or shared_template.");
+  }
+  const endpointVariable = melipayamakMode === "native_otp"
+    ? "MELIPAYAMAK_OTP_ENDPOINT"
+    : "MELIPAYAMAK_SHARED_ENDPOINT";
+  const endpointPath = melipayamakMode === "native_otp" ? "/api/send/otp/" : "/api/send/shared/";
+  const melipayamakEndpoint = readHttpsUrl(environment, endpointVariable);
   if (
     melipayamakEndpoint.hostname !== MELIPAYAMAK_HOSTNAME ||
     (melipayamakEndpoint.port !== "" && melipayamakEndpoint.port !== "443") ||
-    !melipayamakEndpoint.pathname.startsWith("/api/send/shared/") ||
-    melipayamakEndpoint.pathname === "/api/send/shared/"
+    !melipayamakEndpoint.pathname.startsWith(endpointPath) ||
+    melipayamakEndpoint.pathname === endpointPath
   ) {
-    throw new Error("MELIPAYAMAK_SHARED_ENDPOINT must be the complete MeliPayamak shared-service endpoint.");
+    throw new Error(`${endpointVariable} must be the complete MeliPayamak ${melipayamakMode} endpoint.`);
   }
-  const melipayamakBodyId = environment.MELIPAYAMAK_BODY_ID;
-  if (!melipayamakBodyId || !/^[1-9][0-9]*$/.test(melipayamakBodyId) ||
-      !Number.isSafeInteger(Number(melipayamakBodyId))) {
-    throw new Error("MELIPAYAMAK_BODY_ID must be a positive integer in production.");
+  if (melipayamakMode === "shared_template") {
+    const melipayamakBodyId = environment.MELIPAYAMAK_BODY_ID;
+    if (!melipayamakBodyId || !/^[1-9][0-9]*$/.test(melipayamakBodyId) ||
+        !Number.isSafeInteger(Number(melipayamakBodyId))) {
+      throw new Error("MELIPAYAMAK_BODY_ID must be a positive integer in shared_template mode.");
+    }
   }
   const smsTimeoutMs = Number(environment.SMS_TIMEOUT_MS);
   if (!Number.isInteger(smsTimeoutMs) || smsTimeoutMs < 1_000 || smsTimeoutMs > 15_000) {
