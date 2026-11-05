@@ -115,6 +115,21 @@ function rejectionCategory(recId: number): SmsProviderFailureCategory {
   return "rejected";
 }
 
+function parseProviderInteger(value: unknown) {
+  if (typeof value === "number" && Number.isSafeInteger(value)) return value;
+  if (typeof value !== "string" || !/^-?[0-9]+$/.test(value)) return null;
+  const parsed = Number(value);
+  return Number.isSafeInteger(parsed) ? parsed : null;
+}
+
+function parseAcceptedSharedRecId(value: unknown) {
+  if (typeof value === "number") {
+    return Number.isSafeInteger(value) && value > 0 ? String(value) : null;
+  }
+  if (typeof value !== "string" || !/^[0-9]+$/.test(value)) return null;
+  return /[1-9]/.test(value) ? value : null;
+}
+
 function logProviderAttempt(input: {
   correlationId: string;
   outcome: "accepted" | "rejected" | "failed";
@@ -238,9 +253,10 @@ export async function sendMeliPayamakOtp(
     }
     if (status.trim() !== "") {
       const responseRecId = (body as { recId?: unknown }).recId;
+      const parsedRecId = parseProviderInteger(responseRecId);
       const error = config.mode === "shared_template" &&
-          typeof responseRecId === "number" && Number.isSafeInteger(responseRecId)
-        ? new SmsProviderError(rejectionCategory(responseRecId), `rec_id_${responseRecId}`)
+          parsedRecId !== null
+        ? new SmsProviderError(rejectionCategory(parsedRecId), `rec_id_${parsedRecId}`)
         : new SmsProviderError("rejected");
       logProviderAttempt({ correlationId, outcome: "rejected", startedAt, error, sendingMode });
       throw error;
@@ -257,12 +273,15 @@ export async function sendMeliPayamakOtp(
       return { verificationCode: code, status };
     }
 
-    const recId = (body as { recId?: unknown }).recId;
-    if (typeof recId !== "number" || !Number.isSafeInteger(recId)) {
-      throw new SmsProviderError("invalid_response");
-    }
-    if (recId <= 0) {
-      const error = new SmsProviderError(rejectionCategory(recId), `rec_id_${recId}`);
+    const responseRecId = (body as { recId?: unknown }).recId;
+    const recId = parseAcceptedSharedRecId(responseRecId);
+    if (recId === null) {
+      const rejectedRecId = parseProviderInteger(responseRecId);
+      if (rejectedRecId === null) throw new SmsProviderError("invalid_response");
+      const error = new SmsProviderError(
+        rejectionCategory(rejectedRecId),
+        `rec_id_${rejectedRecId}`,
+      );
       logProviderAttempt({ correlationId, outcome: "rejected", startedAt, error, sendingMode });
       throw error;
     }

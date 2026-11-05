@@ -133,11 +133,11 @@ test("shared-template SMS request uses exact POST JSON and preserves the OTP str
       calls += 1;
       requestInput = input;
       requestInit = init;
-      return Response.json({ recId: 3741437414, status: "" });
+      return Response.json({ recId: "3741437414", status: "" });
     }) as typeof fetch,
     providerEnvironment,
   );
-  assert.deepEqual(receipt, { verificationCode: "042731", recId: 3741437414, status: "" });
+  assert.deepEqual(receipt, { verificationCode: "042731", recId: "3741437414", status: "" });
   assert.equal(calls, 1);
   assert.equal(String(requestInput), endpoint);
   assert.equal(requestInit?.method, "POST");
@@ -214,7 +214,20 @@ test("native OTP rejects provider errors and ambiguous or unsafe codes", async (
   }
 });
 
-test("provider response accepts only a positive recId with an empty status", async () => {
+test("shared-template response accepts documented string and legacy numeric recIds with an empty status", async () => {
+  for (const [providerRecId, expectedRecId] of [
+    ["3741437414", "3741437414"],
+    [3741437414, "3741437414"],
+    ["90071992547409931234", "90071992547409931234"],
+  ] as const) {
+    const receipt = await sendMeliPayamakOtp(
+      "+989121234567",
+      "123456",
+      (async () => Response.json({ recId: providerRecId, status: "" })) as typeof fetch,
+      providerEnvironment,
+    );
+    assert.equal(receipt.recId, expectedRecId);
+  }
   await assert.rejects(
     sendMeliPayamakOtp(
       "+989121234567",
@@ -229,7 +242,9 @@ test("provider response accepts only a positive recId with an empty status", asy
     Response.json({}),
     Response.json({ recId: 1 }),
     Response.json({ status: "" }),
-    Response.json({ recId: "1", status: "" }),
+    Response.json({ recId: "", status: "" }),
+    Response.json({ recId: "1.5", status: "" }),
+    Response.json({ recId: "accepted", status: "" }),
     Response.json({ recId: 1, status: 0 }),
     Response.json([1, ""]),
   ]) {
@@ -238,6 +253,15 @@ test("provider response accepts only a positive recId with an empty status", asy
       assertCategory("invalid_response"),
     );
   }
+  await assert.rejects(
+    sendMeliPayamakOtp(
+      "+989121234567",
+      "123456",
+      (async () => Response.json({ recId: "0", status: "" })) as typeof fetch,
+      providerEnvironment,
+    ),
+    assertCategory("authentication"),
+  );
 });
 
 test("documented shared-service error recIds are rejected and categorized", async () => {
@@ -258,6 +282,15 @@ test("documented shared-service error recIds are rejected and categorized", asyn
       assertCategory(category),
     );
   }
+  await assert.rejects(
+    sendMeliPayamakOtp(
+      "+989121234567",
+      "123456",
+      (async () => Response.json({ recId: "-4", status: "provider detail" })) as typeof fetch,
+      providerEnvironment,
+    ),
+    assertCategory("invalid_pattern"),
+  );
 });
 
 test("provider failures, redirects, and bounded responses fail safely without retry", async () => {
