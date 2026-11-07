@@ -2,6 +2,11 @@ import assert from "node:assert/strict";
 import { after, before, test } from "node:test";
 import postgres from "postgres";
 import { endDatabaseConnection } from "../../src/db";
+import {
+  AdminPackageError,
+  createAdminPackage,
+  updateAdminPackage,
+} from "../../src/admin/packages";
 import { publishJobPost, PublishJobError } from "../../src/jobs/publish";
 import { confirmPackagePurchasePaid } from "../../src/packages/confirm-purchase";
 import { processSepCallback } from "../../src/payments/callback";
@@ -42,6 +47,7 @@ const ids = {
   replayPurchase: "50000000-0000-4000-8000-000000000006",
   replayAttemptA: "70000000-0000-4000-8000-000000000005",
   replayAttemptB: "70000000-0000-4000-8000-000000000006",
+  admin: "80000000-0000-4000-8000-000000000001",
 };
 
 const sepConfig: SepConfig = {
@@ -68,9 +74,10 @@ async function insertAttempt(id: string, purchaseId: string) {
 }
 
 before(async () => {
-  await sql`truncate table employer_accounts, industries cascade`;
+  await sql`truncate table employer_accounts, industries, admin_accounts cascade`;
   await sql`insert into industries (id, name, slug) values (${ids.industry}, 'Integration', 'integration')`;
   await sql`insert into employer_accounts (id, mobile) values (${ids.employer}, '+989120000001')`;
+  await sql`insert into admin_accounts (id, email) values (${ids.admin}, 'package-owner@example.test')`;
   await sql`
     insert into companies (id, employer_account_id, industry_id, name, address, founding_year)
     values (${ids.company}, ${ids.employer}, ${ids.industry}, 'Integration Company', 'Test only', 1400)
@@ -337,4 +344,54 @@ test("a provider reference cannot be attached to two payment attempts", async ()
       failure_category: "reference_or_amount_conflict",
     },
   ]);
+});
+
+test("Admin package mutation writes its audit event and protects stale edits", async () => {
+  const packageId = await createAdminPackage(ids.admin, {
+    name: "Admin integration package",
+    priceToman: 20_000,
+    jobCredits: 2,
+    isActive: true,
+  });
+  const [created] = await sql`
+    select updated_at from job_packages where id = ${packageId}
+  `;
+  await updateAdminPackage(ids.admin, packageId, created.updated_at, {
+    name: "Admin integration package updated",
+    priceToman: 30_000,
+    jobCredits: 3,
+    isActive: false,
+  });
+  await assert.rejects(
+    updateAdminPackage(ids.admin, packageId, created.updated_at, {
+      name: "Stale overwrite",
+      priceToman: 1,
+      jobCredits: 1,
+      isActive: true,
+    }),
+    (error: unknown) => error instanceof AdminPackageError && error.code === "STALE_UPDATE",
+  );
+
+  const audit = await sql`
+    select action, target_id from admin_audit_events
+    where target_id = ${packageId} order by occurred_at
+  `;
+  assert.deepEqual(audit, [
+    { action: "admin.packages.create", target_id: packageId },
+    { action: "admin.packages.deactivate", target_id: packageId },
+  ]);
+});
+
+test("an audit write failure rolls back the privileged package mutation", async () => {
+  const name = "Must roll back with audit";
+  await assert.rejects(createAdminPackage("90000000-0000-4000-8000-000000000099", {
+    name,
+    priceToman: 10_000,
+    jobCredits: 1,
+    isActive: true,
+  }));
+  const [result] = await sql`
+    select count(*)::int as value from job_packages where name = ${name}
+  `;
+  assert.equal(result.value, 0);
 });

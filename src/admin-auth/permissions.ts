@@ -17,6 +17,7 @@ export const ownerOnlyOperations = [
   "admin.accounts.create",
   "admin.accounts.status.manage",
   "admin.accounts.permissions.manage",
+  "admin.packages.manage",
 ] as const;
 
 export type OwnerOnlyOperation = (typeof ownerOnlyOperations)[number];

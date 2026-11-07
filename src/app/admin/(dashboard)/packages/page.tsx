@@ -1,0 +1,70 @@
+import type { Metadata } from "next";
+import { requireOwnerOnlyOperation } from "@/admin-auth/rbac-guards";
+import { listAdminPackages } from "@/admin/packages";
+import { PendingSubmitButton } from "@/components/admin/pending-submit-button";
+import { Badge, Card, Input, Label } from "@/components/ui";
+import { createPackageAction, updatePackageAction } from "./actions";
+
+export const metadata: Metadata = { title: "مدیریت بسته‌های آگهی" };
+export const dynamic = "force-dynamic";
+
+const numberFormatter = new Intl.NumberFormat("fa-IR");
+const dateFormatter = new Intl.DateTimeFormat("fa-IR", { dateStyle: "medium", timeStyle: "short" });
+
+const resultMessages: Record<string, { tone: string; text: string }> = {
+  created: { tone: "border-success/30 bg-success/10 text-success", text: "بسته با موفقیت ایجاد شد." },
+  updated: { tone: "border-success/30 bg-success/10 text-success", text: "تغییرات بسته با موفقیت ذخیره شد." },
+  invalid: { tone: "border-danger/30 bg-danger/10 text-danger", text: "مقادیر واردشده معتبر نیست. قیمت و اعتبار باید عدد صحیح مثبت باشند." },
+  stale: { tone: "border-warning/30 bg-warning/10 text-text-primary", text: "این بسته هم‌زمان تغییر کرده است. صفحه تازه شد؛ تغییرات را دوباره بررسی کنید." },
+  error: { tone: "border-danger/30 bg-danger/10 text-danger", text: "ذخیره بسته انجام نشد. دوباره تلاش کنید." },
+};
+
+interface PageProps { searchParams: Promise<{ result?: string | string[] }>; }
+
+export default async function AdminPackagesPage({ searchParams }: PageProps) {
+  await requireOwnerOnlyOperation("admin.packages.manage");
+  const packages = await listAdminPackages();
+  const rawResult = (await searchParams).result;
+  const message = typeof rawResult === "string" ? resultMessages[rawResult] : undefined;
+
+  return (
+    <div className="grid gap-6">
+      <div>
+        <p className="text-meta">کاتالوگ فروش</p>
+        <h1 className="text-page-title mt-2">مدیریت بسته‌های آگهی</h1>
+        <p className="text-secondary mt-3">تغییرات فقط روی خریدهای جدید اعمال می‌شود؛ snapshot خریدهای قبلی ثابت می‌ماند.</p>
+      </div>
+      {message ? <p role="status" className={`rounded-md border p-3 text-sm ${message.tone}`}>{message.text}</p> : null}
+
+      <Card>
+        <h2 className="text-card-title">ایجاد بسته</h2>
+        <form action={createPackageAction} className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4 xl:items-end">
+          <div><Label htmlFor="new-package-name">نام بسته</Label><Input id="new-package-name" name="name" required maxLength={120} className="mt-2" /></div>
+          <div><Label htmlFor="new-package-price">قیمت (تومان)</Label><Input id="new-package-price" name="priceToman" type="number" inputMode="numeric" min={1} max={2147483647} step={1} required className="mt-2" /></div>
+          <div><Label htmlFor="new-package-credits">تعداد اعتبار آگهی</Label><Input id="new-package-credits" name="jobCredits" type="number" inputMode="numeric" min={1} max={2147483647} step={1} required className="mt-2" /></div>
+          <div className="grid gap-3"><label className="flex min-h-11 items-center gap-2 text-sm font-semibold"><input name="isActive" type="checkbox" defaultChecked /> فعال باشد</label><PendingSubmitButton>ایجاد بسته</PendingSubmitButton></div>
+        </form>
+      </Card>
+
+      <section className="grid gap-4" aria-label="همه بسته‌های آگهی">
+        {packages.length === 0 ? <Card><p className="text-secondary">هنوز بسته‌ای ثبت نشده است.</p></Card> : null}
+        {packages.map((jobPackage) => (
+          <Card key={jobPackage.id} className="shadow-none">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div><h2 className="text-card-title">{jobPackage.name}</h2><p className="text-helper mt-2">ایجاد: {dateFormatter.format(jobPackage.createdAt)} · ویرایش: {dateFormatter.format(jobPackage.updatedAt)}</p></div>
+              <Badge variant={jobPackage.isActive ? "success" : "neutral"}>{jobPackage.isActive ? "فعال" : "غیرفعال"}</Badge>
+            </div>
+            <form action={updatePackageAction} className="mt-5 grid gap-4 border-t border-ui-border pt-5 sm:grid-cols-2 xl:grid-cols-4 xl:items-end">
+              <input type="hidden" name="packageId" value={jobPackage.id} />
+              <input type="hidden" name="updatedAt" value={jobPackage.updatedAt.toISOString()} />
+              <div><Label htmlFor={`name-${jobPackage.id}`}>نام بسته</Label><Input id={`name-${jobPackage.id}`} name="name" defaultValue={jobPackage.name} required maxLength={120} className="mt-2" /></div>
+              <div><Label htmlFor={`price-${jobPackage.id}`}>قیمت (تومان)</Label><Input id={`price-${jobPackage.id}`} name="priceToman" type="number" inputMode="numeric" min={1} max={2147483647} step={1} defaultValue={jobPackage.priceToman} required className="mt-2" /><p className="text-helper mt-1">{numberFormatter.format(jobPackage.priceToman)} تومان</p></div>
+              <div><Label htmlFor={`credits-${jobPackage.id}`}>اعتبار آگهی</Label><Input id={`credits-${jobPackage.id}`} name="jobCredits" type="number" inputMode="numeric" min={1} max={2147483647} step={1} defaultValue={jobPackage.jobCredits} required className="mt-2" /></div>
+              <div className="grid gap-3"><label className="flex min-h-11 items-center gap-2 text-sm font-semibold"><input name="isActive" type="checkbox" defaultChecked={jobPackage.isActive} /> فعال و قابل خرید</label><PendingSubmitButton variant="secondary">ذخیره تغییرات</PendingSubmitButton></div>
+            </form>
+          </Card>
+        ))}
+      </section>
+    </div>
+  );
+}

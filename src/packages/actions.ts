@@ -22,27 +22,28 @@ export async function initiatePackagePurchase(formData: FormData) {
   let createdPurchaseId: string | null = null;
 
   try {
-    const [jobPackage] = await db
-      .select({
-        id: jobPackages.id,
-        name: jobPackages.name,
-        jobCredits: jobPackages.jobCredits,
-        priceToman: jobPackages.priceToman,
-        isActive: jobPackages.isActive,
-      })
-      .from(jobPackages)
-      .where(eq(jobPackages.id, packageId))
-      .limit(1);
+    createdPurchaseId = await db.transaction(async (transaction) => {
+      const [jobPackage] = await transaction
+        .select({
+          id: jobPackages.id,
+          name: jobPackages.name,
+          jobCredits: jobPackages.jobCredits,
+          priceToman: jobPackages.priceToman,
+          isActive: jobPackages.isActive,
+        })
+        .from(jobPackages)
+        .where(eq(jobPackages.id, packageId))
+        .limit(1)
+        .for("share");
 
-    if (!jobPackage || !canInitiatePackagePurchase(jobPackage)) {
-      outcome = "unavailable";
-    } else {
-      const [purchase] = await db
+      if (!jobPackage || !canInitiatePackagePurchase(jobPackage)) return null;
+      const [purchase] = await transaction
         .insert(packagePurchases)
         .values(createPendingPurchaseSnapshot(company.id, jobPackage))
         .returning({ id: packagePurchases.id });
-      createdPurchaseId = purchase.id;
-    }
+      return purchase.id;
+    });
+    outcome = createdPurchaseId ? "pending" : "unavailable";
   } catch {
     outcome = "error";
   }

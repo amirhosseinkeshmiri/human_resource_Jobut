@@ -22,6 +22,16 @@ test("inactive packages cannot initiate purchases", () => {
   );
 });
 
+test("legacy zero-price packages remain stored but cannot enter SEP checkout", () => {
+  assert.equal(canInitiatePackagePurchase({
+    id: "legacy-free",
+    name: "Legacy free package",
+    jobCredits: 1,
+    priceToman: 0,
+    isActive: true,
+  }), false);
+});
+
 test("purchase starts pending with trusted package snapshot values", () => {
   const purchase = createPendingPurchaseSnapshot("authenticated-company", activePackage);
   assert.deepEqual(purchase, {

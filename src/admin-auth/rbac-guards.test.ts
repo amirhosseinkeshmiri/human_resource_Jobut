@@ -144,6 +144,10 @@ test("ordinary permissions cannot authorize owner-only operations", async () => 
     () => ordinary.guards.requireOwnerOnlyOperation("admin.accounts.permissions.manage"),
     "denied",
   );
+  await expectSignal(
+    () => ordinary.guards.requireOwnerOnlyOperation("admin.packages.manage"),
+    "denied",
+  );
 });
 
 test("one resolved principal can be safely reused without duplicate request lookups", async () => {

@@ -7,7 +7,7 @@ export interface PurchasablePackage {
 }
 
 export function canInitiatePackagePurchase(jobPackage: PurchasablePackage) {
-  return jobPackage.isActive && jobPackage.jobCredits > 0 && jobPackage.priceToman >= 0;
+  return jobPackage.isActive && jobPackage.jobCredits > 0 && jobPackage.priceToman > 0;
 }
 
 export function createPendingPurchaseSnapshot(
