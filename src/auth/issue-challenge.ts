@@ -6,6 +6,7 @@ import { deliverVerificationCode, resolveVerificationDeliveryMode } from "./deli
 import type { AuthIdentifier } from "./identifier";
 import {
   createOtpCorrelationId,
+  logOtpChallengeActivated,
   logOtpFailure,
   type OtpProvider,
   type OtpStage,
@@ -23,6 +24,23 @@ export class ChallengeCooldownError extends Error {
     super("challenge_cooldown");
     this.name = "ChallengeCooldownError";
   }
+}
+
+export class VerificationChallengeError extends Error {
+  constructor(public readonly stage: OtpStage, cause?: unknown) {
+    super("verification_challenge_failed", { cause });
+    this.name = "VerificationChallengeError";
+  }
+}
+
+export function verificationChallengeErrorMessage(error: unknown) {
+  if (error instanceof ChallengeCooldownError) {
+    return "برای دریافت کد جدید کمی صبر کنید.";
+  }
+  if (error instanceof VerificationChallengeError && error.stage === "challenge_activate") {
+    return "درخواست ارسال کد پذیرفته شد، اما فعال‌سازی امن کد ورود انجام نشد. لطفاً کد جدید بگیرید.";
+  }
+  return "ارسال کد ورود انجام نشد. دوباره تلاش کنید.";
 }
 
 interface IssueChallengeCallbacks {
@@ -70,6 +88,7 @@ export async function issueVerificationChallenge(
       expiresAt: new Date(Date.now() + VERIFICATION_CODE_TTL_MINUTES * 60 * 1000),
     });
     if (!activated) throw new Error("challenge_activation_failed");
+    logOtpChallengeActivated({ correlationId, provider, startedAt });
     return { challengeId: id, developmentCode: delivery.developmentCode };
   } catch (error) {
     logOtpFailure({ correlationId, stage, provider, error, startedAt });
@@ -84,6 +103,7 @@ export async function issueVerificationChallenge(
         });
       });
     }
-    throw new Error("verification_delivery_failed");
+    if (error instanceof ChallengeCooldownError) throw error;
+    throw new VerificationChallengeError(stage, error);
   }
 }

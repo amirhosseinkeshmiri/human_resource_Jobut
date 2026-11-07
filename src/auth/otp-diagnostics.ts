@@ -121,3 +121,16 @@ export function logOtpFailure(input: {
     ...(proxyFailure ? { forwardedChainLength: proxyFailure.forwardedChainLength } : {}),
   }));
 }
+
+export function logOtpChallengeActivated(input: {
+  correlationId: string;
+  provider: OtpProvider;
+  startedAt: number;
+}) {
+  console.info(JSON.stringify({
+    event: "otp_challenge_activated",
+    correlationId: input.correlationId,
+    provider: input.provider,
+    durationMs: Math.max(0, Date.now() - input.startedAt),
+  }));
+}

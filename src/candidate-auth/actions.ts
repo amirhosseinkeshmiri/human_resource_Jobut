@@ -22,6 +22,7 @@ import {
   ChallengeCooldownError,
   isWithinVerificationCodeCooldown,
   issueVerificationChallenge,
+  verificationChallengeErrorMessage,
 } from "@/auth/issue-challenge";
 import { logAuthFormDataRejection, logAuthOriginRejection } from "@/auth/rejection-diagnostics";
 import { inspectTrustedAuthActionRequest } from "@/auth/request-security";
@@ -134,10 +135,7 @@ export async function requestCandidateVerificationCode(
   } catch (error) {
     return {
       status: "error",
-      message:
-        error instanceof ChallengeCooldownError
-          ? "برای دریافت کد جدید کمی صبر کنید."
-          : "ارسال کد ورود انجام نشد. دوباره تلاش کنید.",
+      message: verificationChallengeErrorMessage(error),
     };
   }
   return {
