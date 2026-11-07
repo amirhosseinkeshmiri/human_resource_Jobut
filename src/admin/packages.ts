@@ -1,14 +1,18 @@
 import "server-only";
 
 import { randomUUID } from "node:crypto";
-import { and, desc, eq } from "drizzle-orm";
+import { desc, eq } from "drizzle-orm";
 import { db } from "@/db";
-import { adminAuditEvents, jobPackages } from "@/db/schema";
+import { adminAuditEvents, jobPackages, packagePurchases } from "@/db/schema";
 import { sanitizeAdminAuditMetadata } from "@/admin-auth/rbac-service";
-import type { AdminPackageInput } from "./package-policy";
+import {
+  isMatchingPackageVersion,
+  nextPackageVersion,
+  type AdminPackageInput,
+} from "./package-policy";
 
 export class AdminPackageError extends Error {
-  constructor(public readonly code: "NOT_FOUND" | "STALE_UPDATE") {
+  constructor(public readonly code: "NOT_FOUND" | "STALE_UPDATE" | "DELETE_BLOCKED" | "CONFIRMATION_MISMATCH") {
     super(code);
     this.name = "AdminPackageError";
   }
@@ -54,7 +58,7 @@ export async function createAdminPackage(actorAdminAccountId: string, input: Adm
         isActive: input.isActive,
         displayOrder: input.displayOrder,
         displayValidityText: input.displayValidityText,
-        paymentDescription: input.paymentDescription,
+        paymentDescription: input.paymentDescription?.slice(0, 200) ?? null,
         onlineCheckoutEnabled: input.onlineCheckoutEnabled,
       },
     });
@@ -70,12 +74,15 @@ export async function updateAdminPackage(
 ) {
   return db.transaction(async (transaction) => {
     const [current] = await transaction.select().from(jobPackages)
-      .where(eq(jobPackages.id, packageId)).limit(1);
+      .where(eq(jobPackages.id, packageId)).limit(1).for("update");
     if (!current) throw new AdminPackageError("NOT_FOUND");
+    if (!isMatchingPackageVersion(current.updatedAt, expectedUpdatedAt)) {
+      throw new AdminPackageError("STALE_UPDATE");
+    }
 
-    const now = new Date();
-    const [updated] = await transaction.update(jobPackages).set({ ...input, updatedAt: now })
-      .where(and(eq(jobPackages.id, packageId), eq(jobPackages.updatedAt, expectedUpdatedAt)))
+    const updatedAt = nextPackageVersion(current.updatedAt);
+    const [updated] = await transaction.update(jobPackages).set({ ...input, updatedAt })
+      .where(eq(jobPackages.id, packageId))
       .returning({ id: jobPackages.id });
     if (!updated) throw new AdminPackageError("STALE_UPDATE");
 
@@ -102,6 +109,56 @@ export async function updateAdminPackage(
         newDisplayOrder: input.displayOrder,
         previousOnlineCheckoutEnabled: current.onlineCheckoutEnabled,
         newOnlineCheckoutEnabled: input.onlineCheckoutEnabled,
+      },
+    });
+  });
+}
+
+export async function deleteAdminPackage(
+  actorAdminAccountId: string,
+  packageId: string,
+  expectedUpdatedAt: Date,
+  confirmedName: string,
+) {
+  return db.transaction(async (transaction) => {
+    const [current] = await transaction.select().from(jobPackages)
+      .where(eq(jobPackages.id, packageId)).limit(1).for("update");
+    if (!current) throw new AdminPackageError("NOT_FOUND");
+    if (!isMatchingPackageVersion(current.updatedAt, expectedUpdatedAt)) {
+      throw new AdminPackageError("STALE_UPDATE");
+    }
+    if (confirmedName !== current.name) {
+      throw new AdminPackageError("CONFIRMATION_MISMATCH");
+    }
+
+    const [dependency] = await transaction.select({ id: packagePurchases.id })
+      .from(packagePurchases)
+      .where(eq(packagePurchases.jobPackageId, packageId))
+      .limit(1);
+    if (dependency) throw new AdminPackageError("DELETE_BLOCKED");
+
+    const [deleted] = await transaction.delete(jobPackages)
+      .where(eq(jobPackages.id, packageId))
+      .returning({ id: jobPackages.id });
+    if (!deleted) throw new AdminPackageError("NOT_FOUND");
+
+    await insertAudit(transaction, {
+      actorAdminAccountId,
+      action: "admin.packages.delete",
+      targetId: current.id,
+      metadata: {
+        snapshot: {
+          name: current.name,
+          priceToman: current.priceToman,
+          jobCredits: current.jobCredits,
+          isActive: current.isActive,
+          displayOrder: current.displayOrder,
+          displayValidityText: current.displayValidityText,
+          paymentDescription: current.paymentDescription?.slice(0, 200) ?? null,
+          onlineCheckoutEnabled: current.onlineCheckoutEnabled,
+          createdAt: current.createdAt.toISOString(),
+          updatedAt: current.updatedAt.toISOString(),
+        },
       },
     });
   });

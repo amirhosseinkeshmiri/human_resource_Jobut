@@ -5,6 +5,7 @@ import { endDatabaseConnection } from "../../src/db";
 import {
   AdminPackageError,
   createAdminPackage,
+  deleteAdminPackage,
   updateAdminPackage,
 } from "../../src/admin/packages";
 import { publishJobPost, PublishJobError } from "../../src/jobs/publish";
@@ -372,6 +373,17 @@ test("Admin package mutation writes its audit event and protects stale edits", a
     paymentDescription: "Paid online",
     onlineCheckoutEnabled: true,
   });
+  const [afterEdit] = await sql`select updated_at from job_packages where id = ${packageId}`;
+  await updateAdminPackage(ids.admin, packageId, afterEdit.updated_at, {
+    name: "Admin integration package updated",
+    priceToman: 30_000,
+    jobCredits: 3,
+    isActive: false,
+    displayOrder: 10,
+    displayValidityText: null,
+    paymentDescription: "Paid online",
+    onlineCheckoutEnabled: true,
+  });
   await assert.rejects(
     updateAdminPackage(ids.admin, packageId, created.updated_at, {
       name: "Stale overwrite",
@@ -394,6 +406,7 @@ test("Admin package mutation writes its audit event and protects stale edits", a
   assert.deepEqual(audit, [
     { action: "admin.packages.create", target_id: packageId },
     { action: "admin.packages.deactivate", target_id: packageId },
+    { action: "admin.packages.update", target_id: packageId },
   ]);
 });
 
@@ -413,4 +426,147 @@ test("an audit write failure rolls back the privileged package mutation", async 
     select count(*)::int as value from job_packages where name = ${name}
   `;
   assert.equal(result.value, 0);
+});
+
+test("an audit failure rolls back an existing package edit", async () => {
+  const packageId = await createAdminPackage(ids.admin, {
+    name: "Edit rollback package",
+    priceToman: 11_000,
+    jobCredits: 1,
+    isActive: true,
+    displayOrder: null,
+    displayValidityText: null,
+    paymentDescription: null,
+    onlineCheckoutEnabled: true,
+  });
+  const [before] = await sql`select updated_at from job_packages where id = ${packageId}`;
+  await assert.rejects(updateAdminPackage(
+    "90000000-0000-4000-8000-000000000099",
+    packageId,
+    before.updated_at,
+    {
+      name: "Must not persist",
+      priceToman: 99_000,
+      jobCredits: 9,
+      isActive: false,
+      displayOrder: 99,
+      displayValidityText: "Must roll back",
+      paymentDescription: "Must roll back",
+      onlineCheckoutEnabled: false,
+    },
+  ));
+  const [after] = await sql`
+    select name, price_toman, job_credits from job_packages where id = ${packageId}
+  `;
+  assert.deepEqual(after, {
+    name: "Edit rollback package",
+    price_toman: 11_000,
+    job_credits: 1,
+  });
+});
+
+test("an unreferenced package is permanently deleted and its audit survives", async () => {
+  const packageId = await createAdminPackage(ids.admin, {
+    name: "Safe delete package",
+    priceToman: 12_000,
+    jobCredits: 1,
+    isActive: true,
+    displayOrder: null,
+    displayValidityText: null,
+    paymentDescription: null,
+    onlineCheckoutEnabled: true,
+  });
+  const [current] = await sql`
+    select name, updated_at from job_packages where id = ${packageId}
+  `;
+  await deleteAdminPackage(ids.admin, packageId, current.updated_at, current.name);
+  await assert.rejects(
+    deleteAdminPackage(ids.admin, packageId, current.updated_at, current.name),
+    (error: unknown) => error instanceof AdminPackageError && error.code === "NOT_FOUND",
+  );
+  const [remaining] = await sql`
+    select count(*)::int as value from job_packages where id = ${packageId}
+  `;
+  const [audit] = await sql`
+    select action, target_id from admin_audit_events
+    where target_id = ${packageId} and action = 'admin.packages.delete'
+  `;
+  assert.equal(remaining.value, 0);
+  assert.deepEqual(audit, { action: "admin.packages.delete", target_id: packageId });
+});
+
+test("pending and paid purchase history permanently blocks package deletion", async () => {
+  const packageId = await createAdminPackage(ids.admin, {
+    name: "Protected delete package",
+    priceToman: 13_000,
+    jobCredits: 1,
+    isActive: true,
+    displayOrder: null,
+    displayValidityText: null,
+    paymentDescription: null,
+    onlineCheckoutEnabled: true,
+  });
+  const [version] = await sql`select updated_at from job_packages where id = ${packageId}`;
+  const [purchase] = await sql`
+    insert into package_purchases
+      (company_id, job_package_id, package_name, job_credits, price_toman, status)
+    values
+      (${ids.company}, ${packageId}, 'Protected snapshot', 1, 13000, 'pending')
+    returning id
+  `;
+  for (const status of ["pending", "paid"] as const) {
+    if (status === "paid") {
+      await sql`update package_purchases set status = 'paid', paid_at = now() where id = ${purchase.id}`;
+    }
+    await assert.rejects(
+      deleteAdminPackage(ids.admin, packageId, version.updated_at, "Protected delete package"),
+      (error: unknown) => error instanceof AdminPackageError && error.code === "DELETE_BLOCKED",
+    );
+  }
+  const [preserved] = await sql`
+    select count(*)::int as value from package_purchases where id = ${purchase.id}
+  `;
+  assert.equal(preserved.value, 1);
+});
+
+test("concurrent purchase creation wins safely against permanent deletion", async () => {
+  const packageId = await createAdminPackage(ids.admin, {
+    name: "Concurrent delete package",
+    priceToman: 14_000,
+    jobCredits: 1,
+    isActive: true,
+    displayOrder: null,
+    displayValidityText: null,
+    paymentDescription: null,
+    onlineCheckoutEnabled: true,
+  });
+  const [version] = await sql`select updated_at from job_packages where id = ${packageId}`;
+  let signalLocked!: () => void;
+  let releasePurchase!: () => void;
+  const locked = new Promise<void>((resolve) => { signalLocked = resolve; });
+  const release = new Promise<void>((resolve) => { releasePurchase = resolve; });
+  const purchase = sql.begin(async (transaction) => {
+    await transaction`select id from job_packages where id = ${packageId} for share`;
+    signalLocked();
+    await release;
+    await transaction`
+      insert into package_purchases
+        (company_id, job_package_id, package_name, job_credits, price_toman, status)
+      values
+        (${ids.company}, ${packageId}, 'Concurrent snapshot', 1, 14000, 'pending')
+    `;
+  });
+  await locked;
+  const deletion = assert.rejects(
+    deleteAdminPackage(
+      ids.admin,
+      packageId,
+      version.updated_at,
+      "Concurrent delete package",
+    ),
+    (error: unknown) => error instanceof AdminPackageError && error.code === "DELETE_BLOCKED",
+  );
+  releasePurchase();
+  await purchase;
+  await deletion;
 });

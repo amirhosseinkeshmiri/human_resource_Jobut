@@ -80,3 +80,11 @@ export function packageSnapshotFields(input: AdminPackageInput) {
     jobCredits: input.jobCredits,
   };
 }
+
+export function isMatchingPackageVersion(current: Date, expected: Date) {
+  return current.getTime() === expected.getTime();
+}
+
+export function nextPackageVersion(current: Date, now = new Date()) {
+  return new Date(Math.max(now.getTime(), current.getTime() + 1));
+}

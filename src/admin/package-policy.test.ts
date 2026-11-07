@@ -1,7 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { createPendingPurchaseSnapshot } from "@/packages/purchase-policy";
-import { parseAdminPackageInput } from "./package-policy";
+import {
+  isMatchingPackageVersion,
+  nextPackageVersion,
+  parseAdminPackageInput,
+} from "./package-policy";
 
 function form(values: Record<string, string>) {
   const data = new FormData();
@@ -57,4 +61,11 @@ test("purchase snapshots remain immutable values after catalog input changes", (
     jobCredits: 1,
     status: "pending",
   });
+});
+
+test("package versions compare at JavaScript precision and advance monotonically", () => {
+  const current = new Date("2026-11-07T08:00:00.123Z");
+  assert.equal(isMatchingPackageVersion(current, new Date(current.toISOString())), true);
+  assert.equal(isMatchingPackageVersion(current, new Date("2026-11-07T08:00:00.124Z")), false);
+  assert.equal(nextPackageVersion(current, current).toISOString(), "2026-11-07T08:00:00.124Z");
 });

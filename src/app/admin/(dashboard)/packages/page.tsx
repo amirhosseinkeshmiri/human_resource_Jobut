@@ -3,7 +3,7 @@ import { requireOwnerOnlyOperation } from "@/admin-auth/rbac-guards";
 import { listAdminPackages } from "@/admin/packages";
 import { PendingSubmitButton } from "@/components/admin/pending-submit-button";
 import { Badge, Card, Input, Label } from "@/components/ui";
-import { createPackageAction, updatePackageAction } from "./actions";
+import { createPackageAction, deletePackageAction, updatePackageAction } from "./actions";
 
 export const metadata: Metadata = { title: "مدیریت بسته‌های آگهی" };
 export const dynamic = "force-dynamic";
@@ -17,6 +17,13 @@ const resultMessages: Record<string, { tone: string; text: string }> = {
   invalid: { tone: "border-danger/30 bg-danger/10 text-danger", text: "مقادیر واردشده معتبر نیست. قیمت و اعتبار باید عدد صحیح مثبت باشند." },
   stale: { tone: "border-warning/30 bg-warning/10 text-text-primary", text: "این بسته هم‌زمان تغییر کرده است. صفحه تازه شد؛ تغییرات را دوباره بررسی کنید." },
   error: { tone: "border-danger/30 bg-danger/10 text-danger", text: "ذخیره بسته انجام نشد. دوباره تلاش کنید." },
+  deleted: { tone: "border-success/30 bg-success/10 text-success", text: "بسته بدون سابقه خرید به‌صورت دائمی حذف شد." },
+  "delete-blocked": { tone: "border-warning/30 bg-warning/10 text-text-primary", text: "این بسته سابقه خرید دارد و قابل حذف دائمی نیست. برای جلوگیری از نمایش و خرید جدید، آن را غیرفعال کنید." },
+  "delete-confirmation": { tone: "border-danger/30 bg-danger/10 text-danger", text: "نام تأییدی با نام فعلی بسته مطابقت ندارد؛ حذف انجام نشد." },
+  "delete-stale": { tone: "border-warning/30 bg-warning/10 text-text-primary", text: "بسته پس از باز شدن فرم تغییر کرده است؛ حذف انجام نشد. اطلاعات تازه را بررسی کنید." },
+  "delete-missing": { tone: "border-warning/30 bg-warning/10 text-text-primary", text: "بسته قبلاً حذف شده یا دیگر وجود ندارد." },
+  "delete-invalid": { tone: "border-danger/30 bg-danger/10 text-danger", text: "درخواست حذف معتبر نیست." },
+  "delete-error": { tone: "border-danger/30 bg-danger/10 text-danger", text: "حذف دائمی انجام نشد و هیچ تغییری ثبت نشد." },
 };
 
 interface PageProps { searchParams: Promise<{ result?: string | string[] }>; }
@@ -70,6 +77,16 @@ export default async function AdminPackagesPage({ searchParams }: PageProps) {
               <div className="grid gap-2"><label className="flex min-h-9 items-center gap-2 text-sm font-semibold"><input name="isActive" type="checkbox" defaultChecked={jobPackage.isActive} /> در جدول عمومی فعال باشد</label><label className="flex min-h-9 items-center gap-2 text-sm font-semibold"><input name="onlineCheckoutEnabled" type="checkbox" defaultChecked={jobPackage.onlineCheckoutEnabled} /> پرداخت آنلاین مجاز باشد</label></div>
               <PendingSubmitButton variant="secondary" className="xl:col-start-4">ذخیره تغییرات</PendingSubmitButton>
             </form>
+            <details className="mt-5 rounded-md border border-danger/30 bg-danger/5 p-4">
+              <summary className="cursor-pointer font-semibold text-danger">حذف دائمی</summary>
+              <p className="text-secondary mt-3">این عملیات برگشت‌پذیر نیست و فقط وقتی انجام می‌شود که هیچ خریدی به بسته وابسته نباشد. در غیر این صورت بسته را غیرفعال کنید.</p>
+              <form action={deletePackageAction} className="mt-4 grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
+                <input type="hidden" name="packageId" value={jobPackage.id} />
+                <input type="hidden" name="updatedAt" value={jobPackage.updatedAt.toISOString()} />
+                <div><Label htmlFor={`delete-name-${jobPackage.id}`}>برای تأیید، نام «{jobPackage.name}» را دقیق وارد کنید</Label><Input id={`delete-name-${jobPackage.id}`} name="confirmedName" required autoComplete="off" className="mt-2" /></div>
+                <PendingSubmitButton variant="destructive">حذف دائمی و برگشت‌ناپذیر</PendingSubmitButton>
+              </form>
+            </details>
           </Card>
         ))}
       </section>
