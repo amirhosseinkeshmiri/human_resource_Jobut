@@ -4,6 +4,11 @@ import Link from "next/link";
 import { PublicFooter } from "@/components/landing/public-footer";
 import { PublicHeader } from "@/components/landing/public-header";
 import { Badge, Card, Container, buttonClassNames } from "@/components/ui";
+import {
+  calculateUnitPriceToman,
+  formatToman,
+  getPublicPackageCatalog,
+} from "@/packages/public-catalog";
 
 export const metadata: Metadata = {
   title: "شبکه استخدامی متخصصین آکادمیک",
@@ -67,15 +72,15 @@ const performance = [
   { value: "۷۳٪", title: "موفقیت در جذب", description: "" },
 ];
 
-const plans = [
-  { name: "تک آگهی - آزاد", credit: "۱ آگهی / ۷ روز", unitPrice: "۳۹۹,۰۰۰ تومان", totalPrice: "۳۹۹,۰۰۰ تومان", payment: ["نقد ابتدای دوره"] },
-  { name: "سه ماهه", credit: "۶ آگهی / ۹۰ روز", unitPrice: "۳۵۰,۰۰۰ تومان", totalPrice: "۲,۱۰۰,۰۰۰ تومان", payment: ["نقد ابتدای دوره"] },
-  { name: "شش ماهه", credit: "۱۵ آگهی / ۱۸۰ روز", unitPrice: "۳۰۰,۰۰۰ تومان", totalPrice: "۴,۵۰۰,۰۰۰ تومان", payment: ["نقد ابتدای دوره"] },
-  { name: "یک ساله", credit: "۳۵ آگهی / ۳۶۵ روز", unitPrice: "۲۵۰,۰۰۰ تومان", totalPrice: "۸,۷۵۰,۰۰۰ تومان", payment: ["نقد ابتدای دوره"] },
-  { name: "یک ساله نامحدود", credit: "۳۵۰ آگهی / ۳۶۵ روز + ۳ ماه بیشتر", unitPrice: "۲۰۰,۰۰۰ تومان", totalPrice: "۷۰,۰۰۰,۰۰۰ تومان", payment: ["سه قسط", "۳۰ میلیون", "۲۰ میلیون", "۲۰ میلیون"] },
-];
+export const dynamic = "force-dynamic";
 
-export default function Home() {
+export default async function Home() {
+  let plans: Awaited<ReturnType<typeof getPublicPackageCatalog>> | null = null;
+  try {
+    plans = await getPublicPackageCatalog();
+  } catch {
+    plans = null;
+  }
   return (
     <>
       <PublicHeader />
@@ -223,20 +228,31 @@ export default function Home() {
             <Card className="mt-6 shadow-none">
               <h3 className="text-card-title">انتشار گسترده آگهی‌های استخدامی</h3>
               <p className="text-secondary mt-3">انتشار آگهی در کانال‌های شبکه استخدامی متخصصین آکادمیک. هر آگهی پس از تأیید، ابتدا در شبکه‌های اجتماعی منتشر می‌شود و سپس در پایان هفته در فهرست آگهی‌ها قرار می‌گیرد. در صورتی که رزومه کافی جذب نشود، پس از بررسی مجدد آگهی و اعمال تغییرات، یک نوبت دیگر منتشر خواهد شد.</p>
-              <p className="text-label mt-4">ساختار پرداخت: تسویه کامل مبلغ قرارداد در ابتدای دوره همکاری</p>
+              <p className="text-label mt-4">پرداخت آنلاین فقط برای بسته‌های دارای دکمه ثبت سفارش و به‌صورت تسویه کامل انجام می‌شود؛ موارد نیازمند هماهنگی به درگاه هدایت نمی‌شوند.</p>
             </Card>
 
+            {plans === null ? (
+              <Card className="mt-6 border-warning/30 bg-warning/10 text-center shadow-none" role="status">
+                <h3 className="text-card-title">تعرفه‌های آنلاین موقتاً در دسترس نیست</h3>
+                <p className="text-secondary mt-2">برای دریافت قیمت به‌روز با ما تماس بگیرید. قیمت قدیمی نمایش داده نمی‌شود.</p>
+                <Link href="#contact" className={buttonClassNames({ variant: "secondary", className: "mt-4" })}>تماس برای استعلام</Link>
+              </Card>
+            ) : plans.length === 0 ? (
+              <Card className="mt-6 text-center shadow-none"><p className="text-secondary">در حال حاضر بسته فعالی برای سفارش وجود ندارد.</p></Card>
+            ) : <>
+            <p className="text-helper mt-5">توضیحات زمانی صرفاً معرفی بازاریابی بسته‌اند و مدت نمایش هر آگهی را تغییر نمی‌دهند.</p>
             <div className="mt-6 grid gap-4 lg:hidden">
               {plans.map((plan) => (
-                <Card key={plan.name} className="shadow-none">
+                <Card key={plan.id} className="shadow-none">
                   <h3 className="text-card-title">{plan.name}</h3>
                   <dl className="mt-4 grid gap-3 text-sm">
-                    <div className="flex justify-between gap-4"><dt className="text-text-muted">اعتبار</dt><dd className="text-end font-medium">{plan.credit}</dd></div>
-                    <div className="flex justify-between gap-4"><dt className="text-text-muted">قیمت هر واحد</dt><dd className="text-end font-medium">{plan.unitPrice}</dd></div>
-                    <div className="flex justify-between gap-4"><dt className="text-text-muted">قیمت کل</dt><dd className="text-end font-bold">{plan.totalPrice}</dd></div>
-                    <div className="flex justify-between gap-4"><dt className="text-text-muted">نوع پرداخت</dt><dd className="text-end">{plan.payment.map((line) => <span key={line} className="block">{line}</span>)}</dd></div>
+                    <div className="flex justify-between gap-4"><dt className="text-text-muted">اعتبار</dt><dd className="text-end font-medium">{new Intl.NumberFormat("fa-IR").format(plan.jobCredits)} آگهی</dd></div>
+                    {plan.displayValidityText ? <div className="flex justify-between gap-4"><dt className="text-text-muted">توضیح دوره</dt><dd className="max-w-[65%] text-end">{plan.displayValidityText}</dd></div> : null}
+                    <div className="flex justify-between gap-4"><dt className="text-text-muted">قیمت هر واحد</dt><dd className="text-end font-medium">{formatToman(calculateUnitPriceToman(plan.priceToman, plan.jobCredits))}</dd></div>
+                    <div className="flex justify-between gap-4"><dt className="text-text-muted">قیمت کل</dt><dd className="text-end font-bold">{formatToman(plan.priceToman)}</dd></div>
+                    <div className="flex justify-between gap-4"><dt className="text-text-muted">نوع پرداخت</dt><dd className="max-w-[65%] text-end">{plan.paymentDescription ?? "تسویه کامل آنلاین"}</dd></div>
                   </dl>
-                  <Link href="/login/employer" className={buttonClassNames({ className: "mt-5 w-full" })}>ثبت سفارش</Link>
+                  <Link href={plan.onlineCheckoutEnabled ? "/login/employer" : "#contact"} className={buttonClassNames({ variant: plan.onlineCheckoutEnabled ? "primary" : "secondary", className: "mt-5 w-full" })}>{plan.onlineCheckoutEnabled ? "ثبت سفارش" : "تماس برای هماهنگی"}</Link>
                 </Card>
               ))}
             </div>
@@ -248,18 +264,19 @@ export default function Home() {
                 </thead>
                 <tbody className="divide-y divide-ui-border">
                   {plans.map((plan) => (
-                    <tr key={plan.name} className="bg-surface align-top">
+                    <tr key={plan.id} className="bg-surface align-top">
                       <th scope="row" className="px-4 py-5 text-start font-semibold">{plan.name}</th>
-                      <td className="px-4 py-5">{plan.credit}</td>
-                      <td className="px-4 py-5">{plan.unitPrice}</td>
-                      <td className="px-4 py-5 font-semibold">{plan.totalPrice}</td>
-                      <td className="px-4 py-5">{plan.payment.map((line) => <span key={line} className="block">{line}</span>)}</td>
-                      <td className="px-4 py-5"><Link href="/login/employer" className={buttonClassNames({ size: "small" })}>ثبت سفارش</Link></td>
+                      <td className="px-4 py-5">{new Intl.NumberFormat("fa-IR").format(plan.jobCredits)} آگهی{plan.displayValidityText ? <span className="text-helper mt-1 block">{plan.displayValidityText}</span> : null}</td>
+                      <td className="px-4 py-5">{formatToman(calculateUnitPriceToman(plan.priceToman, plan.jobCredits))}</td>
+                      <td className="px-4 py-5 font-semibold">{formatToman(plan.priceToman)}</td>
+                      <td className="px-4 py-5">{plan.paymentDescription ?? "تسویه کامل آنلاین"}</td>
+                      <td className="px-4 py-5"><Link href={plan.onlineCheckoutEnabled ? "/login/employer" : "#contact"} className={buttonClassNames({ variant: plan.onlineCheckoutEnabled ? "primary" : "secondary", size: "small" })}>{plan.onlineCheckoutEnabled ? "ثبت سفارش" : "تماس"}</Link></td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
+            </>}
           </Container>
         </section>
 

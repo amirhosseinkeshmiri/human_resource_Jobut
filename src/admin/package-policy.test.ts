@@ -15,7 +15,20 @@ test("Admin package input accepts a bounded paid package and normalizes its name
     priceToman: "250000",
     jobCredits: "3",
     isActive: "on",
-  })), { name: "بسته حرفه‌ای", priceToman: 250000, jobCredits: 3, isActive: true });
+    displayOrder: "20",
+    displayValidityText: "۹۰ روز نمایشی",
+    paymentDescription: "نقد",
+    onlineCheckoutEnabled: "on",
+  })), {
+    name: "بسته حرفه‌ای",
+    priceToman: 250000,
+    jobCredits: 3,
+    isActive: true,
+    displayOrder: 20,
+    displayValidityText: "۹۰ روز نمایشی",
+    paymentDescription: "نقد",
+    onlineCheckoutEnabled: true,
+  });
 });
 
 test("Admin package validation rejects free, fractional, signed, unsafe, and empty values", () => {

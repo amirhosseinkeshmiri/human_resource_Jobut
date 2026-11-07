@@ -197,11 +197,18 @@ export const jobPackages = pgTable(
     jobCredits: integer("job_credits").notNull(),
     priceToman: integer("price_toman").notNull(),
     isActive: boolean("is_active").default(true).notNull(),
+    displayOrder: integer("display_order"),
+    displayValidityText: varchar("display_validity_text", { length: 120 }),
+    paymentDescription: varchar("payment_description", { length: 240 }),
+    onlineCheckoutEnabled: boolean("online_checkout_enabled").default(true).notNull(),
     ...timestamps,
   },
   (table) => [
     check("job_packages_credits_check", sql`${table.jobCredits} > 0`),
     check("job_packages_price_check", sql`${table.priceToman} >= 0`),
+    check("job_packages_display_order_check", sql`${table.displayOrder} is null or ${table.displayOrder} >= 0`),
+    check("job_packages_display_validity_check", sql`${table.displayValidityText} is null or char_length(btrim(${table.displayValidityText})) between 1 and 120`),
+    check("job_packages_payment_description_check", sql`${table.paymentDescription} is null or char_length(btrim(${table.paymentDescription})) between 1 and 240`),
   ],
 );
 

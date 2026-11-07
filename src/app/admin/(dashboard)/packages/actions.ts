@@ -29,6 +29,7 @@ export async function createPackageAction(formData: FormData) {
   }
   revalidatePath("/admin/packages");
   revalidatePath("/employer/packages");
+  revalidatePath("/");
   redirect("/admin/packages?result=created");
 }
 
@@ -57,5 +58,6 @@ export async function updatePackageAction(formData: FormData) {
   }
   revalidatePath("/admin/packages");
   revalidatePath("/employer/packages");
+  revalidatePath("/");
   redirect("/admin/packages?result=updated");
 }

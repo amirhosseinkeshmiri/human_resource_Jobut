@@ -42,7 +42,11 @@ export default async function AdminPackagesPage({ searchParams }: PageProps) {
           <div><Label htmlFor="new-package-name">نام بسته</Label><Input id="new-package-name" name="name" required maxLength={120} className="mt-2" /></div>
           <div><Label htmlFor="new-package-price">قیمت (تومان)</Label><Input id="new-package-price" name="priceToman" type="number" inputMode="numeric" min={1} max={2147483647} step={1} required className="mt-2" /></div>
           <div><Label htmlFor="new-package-credits">تعداد اعتبار آگهی</Label><Input id="new-package-credits" name="jobCredits" type="number" inputMode="numeric" min={1} max={2147483647} step={1} required className="mt-2" /></div>
-          <div className="grid gap-3"><label className="flex min-h-11 items-center gap-2 text-sm font-semibold"><input name="isActive" type="checkbox" defaultChecked /> فعال باشد</label><PendingSubmitButton>ایجاد بسته</PendingSubmitButton></div>
+          <div><Label htmlFor="new-package-order">ترتیب نمایش (اختیاری)</Label><Input id="new-package-order" name="displayOrder" type="number" inputMode="numeric" min={0} max={2147483647} step={1} className="mt-2" /></div>
+          <div><Label htmlFor="new-package-validity">توضیح بازاریابی دوره (اختیاری)</Label><Input id="new-package-validity" name="displayValidityText" maxLength={120} className="mt-2" /><p className="text-helper mt-1">این متن حق یا مدت اعتبار اجرایی ایجاد نمی‌کند.</p></div>
+          <div><Label htmlFor="new-package-payment">توضیح پرداخت (اختیاری)</Label><Input id="new-package-payment" name="paymentDescription" maxLength={240} className="mt-2" /></div>
+          <div className="grid gap-2"><label className="flex min-h-9 items-center gap-2 text-sm font-semibold"><input name="isActive" type="checkbox" defaultChecked /> در جدول عمومی فعال باشد</label><label className="flex min-h-9 items-center gap-2 text-sm font-semibold"><input name="onlineCheckoutEnabled" type="checkbox" defaultChecked /> پرداخت آنلاین مجاز باشد</label></div>
+          <PendingSubmitButton className="xl:col-start-4">ایجاد بسته</PendingSubmitButton>
         </form>
       </Card>
 
@@ -60,7 +64,11 @@ export default async function AdminPackagesPage({ searchParams }: PageProps) {
               <div><Label htmlFor={`name-${jobPackage.id}`}>نام بسته</Label><Input id={`name-${jobPackage.id}`} name="name" defaultValue={jobPackage.name} required maxLength={120} className="mt-2" /></div>
               <div><Label htmlFor={`price-${jobPackage.id}`}>قیمت (تومان)</Label><Input id={`price-${jobPackage.id}`} name="priceToman" type="number" inputMode="numeric" min={1} max={2147483647} step={1} defaultValue={jobPackage.priceToman} required className="mt-2" /><p className="text-helper mt-1">{numberFormatter.format(jobPackage.priceToman)} تومان</p></div>
               <div><Label htmlFor={`credits-${jobPackage.id}`}>اعتبار آگهی</Label><Input id={`credits-${jobPackage.id}`} name="jobCredits" type="number" inputMode="numeric" min={1} max={2147483647} step={1} defaultValue={jobPackage.jobCredits} required className="mt-2" /></div>
-              <div className="grid gap-3"><label className="flex min-h-11 items-center gap-2 text-sm font-semibold"><input name="isActive" type="checkbox" defaultChecked={jobPackage.isActive} /> فعال و قابل خرید</label><PendingSubmitButton variant="secondary">ذخیره تغییرات</PendingSubmitButton></div>
+              <div><Label htmlFor={`order-${jobPackage.id}`}>ترتیب نمایش</Label><Input id={`order-${jobPackage.id}`} name="displayOrder" type="number" inputMode="numeric" min={0} max={2147483647} step={1} defaultValue={jobPackage.displayOrder ?? ""} className="mt-2" /></div>
+              <div><Label htmlFor={`validity-${jobPackage.id}`}>توضیح بازاریابی دوره</Label><Input id={`validity-${jobPackage.id}`} name="displayValidityText" defaultValue={jobPackage.displayValidityText ?? ""} maxLength={120} className="mt-2" /><p className="text-helper mt-1">صرفاً نمایشی؛ مدت نمایش آگهی مستقل است.</p></div>
+              <div><Label htmlFor={`payment-${jobPackage.id}`}>توضیح پرداخت</Label><Input id={`payment-${jobPackage.id}`} name="paymentDescription" defaultValue={jobPackage.paymentDescription ?? ""} maxLength={240} className="mt-2" /></div>
+              <div className="grid gap-2"><label className="flex min-h-9 items-center gap-2 text-sm font-semibold"><input name="isActive" type="checkbox" defaultChecked={jobPackage.isActive} /> در جدول عمومی فعال باشد</label><label className="flex min-h-9 items-center gap-2 text-sm font-semibold"><input name="onlineCheckoutEnabled" type="checkbox" defaultChecked={jobPackage.onlineCheckoutEnabled} /> پرداخت آنلاین مجاز باشد</label></div>
+              <PendingSubmitButton variant="secondary" className="xl:col-start-4">ذخیره تغییرات</PendingSubmitButton>
             </form>
           </Card>
         ))}

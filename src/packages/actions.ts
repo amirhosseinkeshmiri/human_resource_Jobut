@@ -30,6 +30,7 @@ export async function initiatePackagePurchase(formData: FormData) {
           jobCredits: jobPackages.jobCredits,
           priceToman: jobPackages.priceToman,
           isActive: jobPackages.isActive,
+          onlineCheckoutEnabled: jobPackages.onlineCheckoutEnabled,
         })
         .from(jobPackages)
         .where(eq(jobPackages.id, packageId))

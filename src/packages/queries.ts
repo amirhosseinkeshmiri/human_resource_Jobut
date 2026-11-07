@@ -12,9 +12,10 @@ export async function getEmployerPackagesPageData(companyId: string) {
         name: jobPackages.name,
         jobCredits: jobPackages.jobCredits,
         priceToman: jobPackages.priceToman,
+        onlineCheckoutEnabled: jobPackages.onlineCheckoutEnabled,
       })
       .from(jobPackages)
-      .where(eq(jobPackages.isActive, true))
+      .where(and(eq(jobPackages.isActive, true), eq(jobPackages.onlineCheckoutEnabled, true)))
       .orderBy(jobPackages.priceToman),
     db
       .select({

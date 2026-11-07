@@ -14,6 +14,7 @@ import { PaymentError } from "../../src/payments/errors";
 import { initiateSepPayment } from "../../src/payments/initiate";
 import { SepProviderError } from "../../src/payments/sep/adapter";
 import type { SepConfig } from "../../src/payments/sep/config";
+import { getPublicPackageCatalog } from "../../src/packages/public-catalog";
 
 const databaseUrl = process.env.DATABASE_URL;
 const parsedDatabaseUrl = databaseUrl ? new URL(databaseUrl) : null;
@@ -352,15 +353,24 @@ test("Admin package mutation writes its audit event and protects stale edits", a
     priceToman: 20_000,
     jobCredits: 2,
     isActive: true,
+    displayOrder: null,
+    displayValidityText: null,
+    paymentDescription: null,
+    onlineCheckoutEnabled: true,
   });
   const [created] = await sql`
     select updated_at from job_packages where id = ${packageId}
   `;
+  assert.equal((await getPublicPackageCatalog()).some((item) => item.id === packageId), true);
   await updateAdminPackage(ids.admin, packageId, created.updated_at, {
     name: "Admin integration package updated",
     priceToman: 30_000,
     jobCredits: 3,
     isActive: false,
+    displayOrder: 10,
+    displayValidityText: null,
+    paymentDescription: "Paid online",
+    onlineCheckoutEnabled: true,
   });
   await assert.rejects(
     updateAdminPackage(ids.admin, packageId, created.updated_at, {
@@ -368,9 +378,14 @@ test("Admin package mutation writes its audit event and protects stale edits", a
       priceToman: 1,
       jobCredits: 1,
       isActive: true,
+      displayOrder: null,
+      displayValidityText: null,
+      paymentDescription: null,
+      onlineCheckoutEnabled: true,
     }),
     (error: unknown) => error instanceof AdminPackageError && error.code === "STALE_UPDATE",
   );
+  assert.equal((await getPublicPackageCatalog()).some((item) => item.id === packageId), false);
 
   const audit = await sql`
     select action, target_id from admin_audit_events
@@ -389,6 +404,10 @@ test("an audit write failure rolls back the privileged package mutation", async 
     priceToman: 10_000,
     jobCredits: 1,
     isActive: true,
+    displayOrder: null,
+    displayValidityText: null,
+    paymentDescription: null,
+    onlineCheckoutEnabled: true,
   }));
   const [result] = await sql`
     select count(*)::int as value from job_packages where name = ${name}

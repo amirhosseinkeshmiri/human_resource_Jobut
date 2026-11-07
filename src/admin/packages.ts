@@ -52,6 +52,10 @@ export async function createAdminPackage(actorAdminAccountId: string, input: Adm
         priceToman: input.priceToman,
         jobCredits: input.jobCredits,
         isActive: input.isActive,
+        displayOrder: input.displayOrder,
+        displayValidityText: input.displayValidityText,
+        paymentDescription: input.paymentDescription,
+        onlineCheckoutEnabled: input.onlineCheckoutEnabled,
       },
     });
     return created.id;
@@ -94,6 +98,10 @@ export async function updateAdminPackage(
         newJobCredits: input.jobCredits,
         previousIsActive: current.isActive,
         newIsActive: input.isActive,
+        previousDisplayOrder: current.displayOrder,
+        newDisplayOrder: input.displayOrder,
+        previousOnlineCheckoutEnabled: current.onlineCheckoutEnabled,
+        newOnlineCheckoutEnabled: input.onlineCheckoutEnabled,
       },
     });
   });
