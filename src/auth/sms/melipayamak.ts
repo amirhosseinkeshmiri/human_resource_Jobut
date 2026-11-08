@@ -30,16 +30,107 @@ type SmsProviderResponseSignal =
   | "status_nonempty_rec_id_missing_or_invalid"
   | "status_empty_rec_id_nonpositive";
 
+type SharedResponseDiagnostics = {
+  responseEnvelope:
+    | "top_level_object"
+    | "nested_data_object"
+    | "nested_result_object"
+    | "unrecognized_object"
+    | "non_object"
+    | "invalid_json";
+  recIdPresence: "present" | "absent";
+  recIdType: "string" | "number" | "null" | "other" | "absent";
+  recIdShape: "positive_decimal" | "nonpositive_decimal" | "malformed" | "not_applicable";
+  statusType: "string" | "number" | "null" | "other" | "absent";
+  statusShape: "empty" | "nonempty" | "not_applicable";
+  codePresent: boolean;
+};
+
 export class SmsProviderError extends Error {
   constructor(
     public readonly category: SmsProviderFailureCategory,
     public readonly providerCode?: string,
     public readonly providerSignal?: SmsProviderResponseSignal,
+    public readonly sharedResponseDiagnostics?: SharedResponseDiagnostics,
   ) {
     super(category);
     this.name = "SmsProviderError";
   }
 }
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function hasOwn(value: Record<string, unknown>, key: string) {
+  return Object.prototype.hasOwnProperty.call(value, key);
+}
+
+function valueType(value: unknown, present: boolean): SharedResponseDiagnostics["recIdType"] {
+  if (!present) return "absent";
+  if (value === null) return "null";
+  if (typeof value === "string") return "string";
+  if (typeof value === "number") return "number";
+  return "other";
+}
+
+function sharedResponseDiagnostics(body: unknown): SharedResponseDiagnostics {
+  if (!isRecord(body)) {
+    return {
+      responseEnvelope: "non_object",
+      recIdPresence: "absent",
+      recIdType: "absent",
+      recIdShape: "not_applicable",
+      statusType: "absent",
+      statusShape: "not_applicable",
+      codePresent: false,
+    };
+  }
+  const recIdPresent = hasOwn(body, "recId");
+  const statusPresent = hasOwn(body, "status");
+  const recId = body.recId;
+  const status = body.status;
+  const parsedRecId = parseProviderInteger(recId);
+  const nestedData = isRecord(body.data) && (hasOwn(body.data, "recId") || hasOwn(body.data, "status"));
+  const nestedResult = isRecord(body.result) &&
+    (hasOwn(body.result, "recId") || hasOwn(body.result, "status"));
+  return {
+    responseEnvelope: recIdPresent
+      ? "top_level_object"
+      : nestedData
+        ? "nested_data_object"
+        : nestedResult
+          ? "nested_result_object"
+          : statusPresent
+            ? "top_level_object"
+            : "unrecognized_object",
+    recIdPresence: recIdPresent ? "present" : "absent",
+    recIdType: valueType(recId, recIdPresent),
+    recIdShape: !recIdPresent || recId === null ||
+        (typeof recId !== "string" && typeof recId !== "number")
+      ? "not_applicable"
+      : parsedRecId === null
+        ? "malformed"
+        : parsedRecId > 0
+          ? "positive_decimal"
+          : "nonpositive_decimal",
+    statusType: valueType(status, statusPresent),
+    statusShape: typeof status === "string"
+      ? status.trim() === "" ? "empty" : "nonempty"
+      : "not_applicable",
+    codePresent: hasOwn(body, "code"),
+  };
+}
+
+const INVALID_JSON_DIAGNOSTICS: SharedResponseDiagnostics = {
+  responseEnvelope: "invalid_json",
+  recIdPresence: "absent",
+  recIdType: "absent",
+  recIdShape: "not_applicable",
+  statusType: "absent",
+  statusShape: "not_applicable",
+  codePresent: false,
+};
 
 interface MeliPayamakBaseConfig {
   endpoint: URL;
@@ -158,6 +249,9 @@ function logProviderAttempt(input: {
       errorCategory: input.error.category,
       ...(input.error.providerCode ? { providerCode: input.error.providerCode } : {}),
       ...(input.error.providerSignal ? { providerSignal: input.error.providerSignal } : {}),
+      ...(input.sendingMode === "shared_template" && input.error.sharedResponseDiagnostics
+        ? input.error.sharedResponseDiagnostics
+        : {}),
     } : {}),
     durationMs: Math.max(0, Date.now() - input.startedAt),
   });
@@ -254,14 +348,18 @@ export async function sendMeliPayamakOtp(
     try {
       body = JSON.parse(rawBody) as unknown;
     } catch {
-      throw new SmsProviderError("invalid_response");
+      throw new SmsProviderError("invalid_response", undefined, undefined,
+        config.mode === "shared_template" ? INVALID_JSON_DIAGNOSTICS : undefined);
     }
+    const responseDiagnostics = config.mode === "shared_template"
+      ? sharedResponseDiagnostics(body)
+      : undefined;
     if (!body || typeof body !== "object" || Array.isArray(body)) {
-      throw new SmsProviderError("invalid_response");
+      throw new SmsProviderError("invalid_response", undefined, undefined, responseDiagnostics);
     }
     const status = (body as { status?: unknown }).status;
     if (typeof status !== "string") {
-      throw new SmsProviderError("invalid_response");
+      throw new SmsProviderError("invalid_response", undefined, undefined, responseDiagnostics);
     }
     if (status.trim() !== "") {
       const responseRecId = (body as { recId?: unknown }).recId;
@@ -275,11 +373,13 @@ export async function sendMeliPayamakOtp(
               parsedRecId > 0
                 ? "status_nonempty_rec_id_positive"
                 : "status_nonempty_rec_id_nonpositive",
+              responseDiagnostics,
             )
           : new SmsProviderError(
               "rejected",
               undefined,
               "status_nonempty_rec_id_missing_or_invalid",
+              responseDiagnostics,
             );
       logProviderAttempt({ correlationId, outcome: "rejected", startedAt, error, sendingMode });
       throw error;
@@ -300,11 +400,14 @@ export async function sendMeliPayamakOtp(
     const recId = parseAcceptedSharedRecId(responseRecId);
     if (recId === null) {
       const rejectedRecId = parseProviderInteger(responseRecId);
-      if (rejectedRecId === null) throw new SmsProviderError("invalid_response");
+      if (rejectedRecId === null) {
+        throw new SmsProviderError("invalid_response", undefined, undefined, responseDiagnostics);
+      }
       const error = new SmsProviderError(
         rejectionCategory(rejectedRecId),
         safeRejectionCode(rejectedRecId),
         "status_empty_rec_id_nonpositive",
+        responseDiagnostics,
       );
       logProviderAttempt({ correlationId, outcome: "rejected", startedAt, error, sendingMode });
       throw error;

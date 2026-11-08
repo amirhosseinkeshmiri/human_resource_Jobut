@@ -345,6 +345,89 @@ test("shared-template rejection logs only bounded response-shape diagnostics", a
   }
 });
 
+test("failed shared-template responses log only fixed allowlisted shape labels", async () => {
+  const originalError = console.error;
+  const entries: string[] = [];
+  console.error = (value?: unknown) => { entries.push(String(value)); };
+  const responses: unknown[] = [
+    { status: "secret rejection", code: "secret-code" },
+    { recId: "3741437414", status: "secret rejection" },
+    { recId: -1, status: "secret rejection" },
+    { recId: "not-a-receipt-secret", status: "secret rejection" },
+    { recId: null, status: "secret rejection" },
+    { recId: { private: "secret" }, status: "secret rejection" },
+    { recId: 1, status: 7 },
+    { recId: 1, status: null },
+    { recId: 1, status: { private: "secret" } },
+    { status: "top-level secret status", data: { recId: "nested-secret-receipt", status: "nested secret status" }, code: "secret" },
+    { result: { recId: "nested-secret-receipt", status: "nested secret status" } },
+    { unexpectedSecretKey: "secret-value" },
+    ["secret-array-value"],
+  ];
+  try {
+    for (const response of responses) {
+      await assert.rejects(sendMeliPayamakOtp(
+        "+989121234567",
+        "654321",
+        (async () => Response.json(response)) as typeof fetch,
+        providerEnvironment,
+        "00000000-0000-4000-8000-000000000008",
+      ));
+    }
+    await assert.rejects(sendMeliPayamakOtp(
+      "+989121234567",
+      "654321",
+      (async () => new Response("secret invalid json", { status: 200 })) as typeof fetch,
+      providerEnvironment,
+      "00000000-0000-4000-8000-000000000008",
+    ));
+  } finally {
+    console.error = originalError;
+  }
+
+  const attempts = entries.map((entry) => JSON.parse(entry) as Record<string, unknown>);
+  assert.equal(attempts.length, responses.length + 1);
+  assert.deepEqual(
+    attempts.map(({ responseEnvelope, recIdPresence, recIdType, recIdShape, statusType, statusShape, codePresent }) =>
+      ({ responseEnvelope, recIdPresence, recIdType, recIdShape, statusType, statusShape, codePresent })),
+    [
+      { responseEnvelope: "top_level_object", recIdPresence: "absent", recIdType: "absent", recIdShape: "not_applicable", statusType: "string", statusShape: "nonempty", codePresent: true },
+      { responseEnvelope: "top_level_object", recIdPresence: "present", recIdType: "string", recIdShape: "positive_decimal", statusType: "string", statusShape: "nonempty", codePresent: false },
+      { responseEnvelope: "top_level_object", recIdPresence: "present", recIdType: "number", recIdShape: "nonpositive_decimal", statusType: "string", statusShape: "nonempty", codePresent: false },
+      { responseEnvelope: "top_level_object", recIdPresence: "present", recIdType: "string", recIdShape: "malformed", statusType: "string", statusShape: "nonempty", codePresent: false },
+      { responseEnvelope: "top_level_object", recIdPresence: "present", recIdType: "null", recIdShape: "not_applicable", statusType: "string", statusShape: "nonempty", codePresent: false },
+      { responseEnvelope: "top_level_object", recIdPresence: "present", recIdType: "other", recIdShape: "not_applicable", statusType: "string", statusShape: "nonempty", codePresent: false },
+      { responseEnvelope: "top_level_object", recIdPresence: "present", recIdType: "number", recIdShape: "positive_decimal", statusType: "number", statusShape: "not_applicable", codePresent: false },
+      { responseEnvelope: "top_level_object", recIdPresence: "present", recIdType: "number", recIdShape: "positive_decimal", statusType: "null", statusShape: "not_applicable", codePresent: false },
+      { responseEnvelope: "top_level_object", recIdPresence: "present", recIdType: "number", recIdShape: "positive_decimal", statusType: "other", statusShape: "not_applicable", codePresent: false },
+      { responseEnvelope: "nested_data_object", recIdPresence: "absent", recIdType: "absent", recIdShape: "not_applicable", statusType: "string", statusShape: "nonempty", codePresent: true },
+      { responseEnvelope: "nested_result_object", recIdPresence: "absent", recIdType: "absent", recIdShape: "not_applicable", statusType: "absent", statusShape: "not_applicable", codePresent: false },
+      { responseEnvelope: "unrecognized_object", recIdPresence: "absent", recIdType: "absent", recIdShape: "not_applicable", statusType: "absent", statusShape: "not_applicable", codePresent: false },
+      { responseEnvelope: "non_object", recIdPresence: "absent", recIdType: "absent", recIdShape: "not_applicable", statusType: "absent", statusShape: "not_applicable", codePresent: false },
+      { responseEnvelope: "invalid_json", recIdPresence: "absent", recIdType: "absent", recIdShape: "not_applicable", statusType: "absent", statusShape: "not_applicable", codePresent: false },
+    ],
+  );
+  const serialized = entries.join("\n");
+  for (const sensitive of [
+    "secret rejection",
+    "secret-code",
+    "not-a-receipt-secret",
+    "nested-secret-receipt",
+    "nested secret status",
+    "top-level secret status",
+    "unexpectedSecretKey",
+    "secret-value",
+    "secret-array-value",
+    "secret invalid json",
+    "654321",
+    "+989121234567",
+    "09121234567",
+    endpoint,
+  ]) {
+    assert.equal(serialized.includes(sensitive), false);
+  }
+});
+
 test("provider failures, redirects, and bounded responses fail safely without retry", async () => {
   for (const [implementation, category] of [
     [(async () => new Response("failure", { status: 500 })) as typeof fetch, "http"],
