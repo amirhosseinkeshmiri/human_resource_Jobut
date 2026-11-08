@@ -353,6 +353,9 @@ test("failed shared-template responses log only fixed allowlisted shape labels",
     { status: "secret rejection", code: "secret-code" },
     { recId: "3741437414", status: "secret rejection" },
     { recId: -1, status: "secret rejection" },
+    { recId: 0, status: "secret rejection" },
+    { recId: 1.5, status: "secret rejection" },
+    { recId: Number.MAX_SAFE_INTEGER + 1, status: "secret rejection" },
     { recId: "not-a-receipt-secret", status: "secret rejection" },
     { recId: null, status: "secret rejection" },
     { recId: { private: "secret" }, status: "secret rejection" },
@@ -377,6 +380,16 @@ test("failed shared-template responses log only fixed allowlisted shape labels",
     await assert.rejects(sendMeliPayamakOtp(
       "+989121234567",
       "654321",
+      (async () => new Response('{"recId":1e400,"status":"nonfinite secret status"}', {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      })) as typeof fetch,
+      providerEnvironment,
+      "00000000-0000-4000-8000-000000000008",
+    ));
+    await assert.rejects(sendMeliPayamakOtp(
+      "+989121234567",
+      "654321",
       (async () => new Response("secret invalid json", { status: 200 })) as typeof fetch,
       providerEnvironment,
       "00000000-0000-4000-8000-000000000008",
@@ -386,14 +399,17 @@ test("failed shared-template responses log only fixed allowlisted shape labels",
   }
 
   const attempts = entries.map((entry) => JSON.parse(entry) as Record<string, unknown>);
-  assert.equal(attempts.length, responses.length + 1);
+  assert.equal(attempts.length, responses.length + 2);
   assert.deepEqual(
     attempts.map(({ responseEnvelope, recIdPresence, recIdType, recIdShape, statusType, statusShape, codePresent }) =>
       ({ responseEnvelope, recIdPresence, recIdType, recIdShape, statusType, statusShape, codePresent })),
     [
       { responseEnvelope: "top_level_object", recIdPresence: "absent", recIdType: "absent", recIdShape: "not_applicable", statusType: "string", statusShape: "nonempty", codePresent: true },
       { responseEnvelope: "top_level_object", recIdPresence: "present", recIdType: "string", recIdShape: "positive_decimal", statusType: "string", statusShape: "nonempty", codePresent: false },
-      { responseEnvelope: "top_level_object", recIdPresence: "present", recIdType: "number", recIdShape: "nonpositive_decimal", statusType: "string", statusShape: "nonempty", codePresent: false },
+      { responseEnvelope: "top_level_object", recIdPresence: "present", recIdType: "number", recIdShape: "negative_decimal", statusType: "string", statusShape: "nonempty", codePresent: false },
+      { responseEnvelope: "top_level_object", recIdPresence: "present", recIdType: "number", recIdShape: "zero", statusType: "string", statusShape: "nonempty", codePresent: false },
+      { responseEnvelope: "top_level_object", recIdPresence: "present", recIdType: "number", recIdShape: "numeric_fractional", statusType: "string", statusShape: "nonempty", codePresent: false },
+      { responseEnvelope: "top_level_object", recIdPresence: "present", recIdType: "number", recIdShape: "numeric_unsafe_integer", statusType: "string", statusShape: "nonempty", codePresent: false },
       { responseEnvelope: "top_level_object", recIdPresence: "present", recIdType: "string", recIdShape: "malformed", statusType: "string", statusShape: "nonempty", codePresent: false },
       { responseEnvelope: "top_level_object", recIdPresence: "present", recIdType: "null", recIdShape: "not_applicable", statusType: "string", statusShape: "nonempty", codePresent: false },
       { responseEnvelope: "top_level_object", recIdPresence: "present", recIdType: "other", recIdShape: "not_applicable", statusType: "string", statusShape: "nonempty", codePresent: false },
@@ -404,6 +420,7 @@ test("failed shared-template responses log only fixed allowlisted shape labels",
       { responseEnvelope: "nested_result_object", recIdPresence: "absent", recIdType: "absent", recIdShape: "not_applicable", statusType: "absent", statusShape: "not_applicable", codePresent: false },
       { responseEnvelope: "unrecognized_object", recIdPresence: "absent", recIdType: "absent", recIdShape: "not_applicable", statusType: "absent", statusShape: "not_applicable", codePresent: false },
       { responseEnvelope: "non_object", recIdPresence: "absent", recIdType: "absent", recIdShape: "not_applicable", statusType: "absent", statusShape: "not_applicable", codePresent: false },
+      { responseEnvelope: "top_level_object", recIdPresence: "present", recIdType: "number", recIdShape: "numeric_nonfinite", statusType: "string", statusShape: "nonempty", codePresent: false },
       { responseEnvelope: "invalid_json", recIdPresence: "absent", recIdType: "absent", recIdShape: "not_applicable", statusType: "absent", statusShape: "not_applicable", codePresent: false },
     ],
   );
@@ -418,6 +435,9 @@ test("failed shared-template responses log only fixed allowlisted shape labels",
     "unexpectedSecretKey",
     "secret-value",
     "secret-array-value",
+    "nonfinite secret status",
+    "9007199254740992",
+    "1e400",
     "secret invalid json",
     "654321",
     "+989121234567",

@@ -40,7 +40,15 @@ type SharedResponseDiagnostics = {
     | "invalid_json";
   recIdPresence: "present" | "absent";
   recIdType: "string" | "number" | "null" | "other" | "absent";
-  recIdShape: "positive_decimal" | "nonpositive_decimal" | "malformed" | "not_applicable";
+  recIdShape:
+    | "positive_decimal"
+    | "zero"
+    | "negative_decimal"
+    | "numeric_nonfinite"
+    | "numeric_fractional"
+    | "numeric_unsafe_integer"
+    | "malformed"
+    | "not_applicable";
   statusType: "string" | "number" | "null" | "other" | "absent";
   statusShape: "empty" | "nonempty" | "not_applicable";
   codePresent: boolean;
@@ -74,6 +82,23 @@ function valueType(value: unknown, present: boolean): SharedResponseDiagnostics[
   return "other";
 }
 
+function recIdShape(value: unknown, present: boolean): SharedResponseDiagnostics["recIdShape"] {
+  if (!present || value === null || (typeof value !== "string" && typeof value !== "number")) {
+    return "not_applicable";
+  }
+  if (typeof value === "number") {
+    if (!Number.isFinite(value)) return "numeric_nonfinite";
+    if (!Number.isInteger(value)) return "numeric_fractional";
+    if (!Number.isSafeInteger(value)) return "numeric_unsafe_integer";
+    if (value === 0) return "zero";
+    return value > 0 ? "positive_decimal" : "negative_decimal";
+  }
+  if (/^0+$/.test(value) || /^-0+$/.test(value)) return "zero";
+  if (/^[0-9]+$/.test(value)) return "positive_decimal";
+  if (/^-[0-9]+$/.test(value)) return "negative_decimal";
+  return "malformed";
+}
+
 function sharedResponseDiagnostics(body: unknown): SharedResponseDiagnostics {
   if (!isRecord(body)) {
     return {
@@ -90,7 +115,6 @@ function sharedResponseDiagnostics(body: unknown): SharedResponseDiagnostics {
   const statusPresent = hasOwn(body, "status");
   const recId = body.recId;
   const status = body.status;
-  const parsedRecId = parseProviderInteger(recId);
   const nestedData = isRecord(body.data) && (hasOwn(body.data, "recId") || hasOwn(body.data, "status"));
   const nestedResult = isRecord(body.result) &&
     (hasOwn(body.result, "recId") || hasOwn(body.result, "status"));
@@ -106,14 +130,7 @@ function sharedResponseDiagnostics(body: unknown): SharedResponseDiagnostics {
             : "unrecognized_object",
     recIdPresence: recIdPresent ? "present" : "absent",
     recIdType: valueType(recId, recIdPresent),
-    recIdShape: !recIdPresent || recId === null ||
-        (typeof recId !== "string" && typeof recId !== "number")
-      ? "not_applicable"
-      : parsedRecId === null
-        ? "malformed"
-        : parsedRecId > 0
-          ? "positive_decimal"
-          : "nonpositive_decimal",
+    recIdShape: recIdShape(recId, recIdPresent),
     statusType: valueType(status, statusPresent),
     statusShape: typeof status === "string"
       ? status.trim() === "" ? "empty" : "nonempty"
