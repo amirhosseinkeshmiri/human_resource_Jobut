@@ -7,6 +7,7 @@ const DEFAULT_TIMEOUT_MS = 5_000;
 const MIN_TIMEOUT_MS = 1_000;
 const MAX_TIMEOUT_MS = 15_000;
 const MAX_RESPONSE_BYTES = 4_096;
+const MAX_REC_ID_DIGITS = 64;
 export const MIN_NATIVE_OTP_LENGTH = 6;
 export const MAX_NATIVE_OTP_LENGTH = 32;
 
@@ -28,7 +29,10 @@ type SmsProviderResponseSignal =
   | "status_nonempty_rec_id_positive"
   | "status_nonempty_rec_id_nonpositive"
   | "status_nonempty_rec_id_missing_or_invalid"
+  | "status_empty_known_error_rec_id"
   | "status_empty_rec_id_nonpositive";
+
+type JsonReviverContext = { source?: string };
 
 type SharedResponseDiagnostics = {
   responseEnvelope:
@@ -234,19 +238,101 @@ function safeRejectionCode(recId: number) {
   return [0, 2, -4, -5].includes(recId) ? `rec_id_${recId}` : undefined;
 }
 
-function parseProviderInteger(value: unknown) {
-  if (typeof value === "number" && Number.isSafeInteger(value)) return value;
-  if (typeof value !== "string" || !/^-?[0-9]+$/.test(value)) return null;
-  const parsed = Number(value);
-  return Number.isSafeInteger(parsed) ? parsed : null;
+function scanJsonStringEnd(source: string, start: number) {
+  let escaped = false;
+  for (let index = start + 1; index < source.length; index += 1) {
+    const character = source[index];
+    if (escaped) escaped = false;
+    else if (character === "\\") escaped = true;
+    else if (character === '"') return index + 1;
+  }
+  return source.length;
 }
 
-function parseAcceptedSharedRecId(value: unknown) {
-  if (typeof value === "number") {
-    return Number.isSafeInteger(value) && value > 0 ? String(value) : null;
+function scanJsonValueEnd(source: string, start: number) {
+  if (source[start] === '"') return scanJsonStringEnd(source, start);
+  if (source[start] !== "{" && source[start] !== "[") {
+    let index = start;
+    while (index < source.length && source[index] !== "," && source[index] !== "}") index += 1;
+    return index;
   }
-  if (typeof value !== "string" || !/^[0-9]+$/.test(value)) return null;
-  return /[1-9]/.test(value) ? value : null;
+  const stack = [source[start]];
+  let index = start + 1;
+  while (index < source.length && stack.length > 0) {
+    const character = source[index];
+    if (character === '"') index = scanJsonStringEnd(source, index);
+    else {
+      if (character === "{" || character === "[") stack.push(character);
+      else if (character === "}" || character === "]") stack.pop();
+      index += 1;
+    }
+  }
+  return index;
+}
+
+function extractTopLevelPropertySource(source: string, property: string) {
+  let index = 0;
+  const skipWhitespace = () => {
+    while (/\s/.test(source[index] ?? "")) index += 1;
+  };
+  skipWhitespace();
+  if (source[index] !== "{") return undefined;
+  index += 1;
+  let found: string | undefined;
+  while (index < source.length) {
+    skipWhitespace();
+    if (source[index] === "}") break;
+    if (source[index] !== '"') return undefined;
+    const keyStart = index;
+    const keyEnd = scanJsonStringEnd(source, keyStart);
+    const key = JSON.parse(source.slice(keyStart, keyEnd)) as string;
+    index = keyEnd;
+    skipWhitespace();
+    if (source[index] !== ":") return undefined;
+    index += 1;
+    skipWhitespace();
+    const valueStart = index;
+    index = scanJsonValueEnd(source, valueStart);
+    if (key === property) found = source.slice(valueStart, index).trim();
+    skipWhitespace();
+    if (source[index] === ",") index += 1;
+    else if (source[index] !== "}") return undefined;
+  }
+  return found;
+}
+
+function parseJsonBody(rawBody: string) {
+  const sources: Array<{ holder: object; source: string }> = [];
+  const body = JSON.parse(rawBody, function (key, value, context?: JsonReviverContext) {
+    if (key === "recId" && typeof context?.source === "string") {
+      sources.push({ holder: this as object, source: context.source });
+    }
+    return value;
+  }) as unknown;
+  const reviverSource = isRecord(body)
+    ? sources.find((candidate) => candidate.holder === body)?.source
+    : undefined;
+  return {
+    body,
+    topLevelRecIdSource: reviverSource ?? extractTopLevelPropertySource(rawBody, "recId"),
+  };
+}
+
+function parseExactSharedRecId(value: unknown, source: string | undefined) {
+  let token: string;
+  if (typeof value === "string") token = value;
+  else if (typeof value === "number" && source && !source.startsWith('"')) token = source;
+  else return null;
+
+  const match = token.match(/^(-?)([0-9]+)$/);
+  if (!match || match[2].length > MAX_REC_ID_DIGITS) return null;
+  const digits = match[2].replace(/^0+(?=\d)/, "");
+  if (match[1] === "-") {
+    const numeric = Number(`-${digits}`);
+    return { kind: "nonpositive" as const, numeric: Number.isSafeInteger(numeric) ? numeric : null };
+  }
+  if (digits === "0") return { kind: "nonpositive" as const, numeric: 0 };
+  return { kind: "positive" as const, receipt: digits };
 }
 
 function logProviderAttempt(input: {
@@ -362,8 +448,9 @@ export async function sendMeliPayamakOtp(
       throw new SmsProviderError("network");
     }
     let body: unknown;
+    let topLevelRecIdSource: string | undefined;
     try {
-      body = JSON.parse(rawBody) as unknown;
+      ({ body, topLevelRecIdSource } = parseJsonBody(rawBody));
     } catch {
       throw new SmsProviderError("invalid_response", undefined, undefined,
         config.mode === "shared_template" ? INVALID_JSON_DIAGNOSTICS : undefined);
@@ -378,30 +465,12 @@ export async function sendMeliPayamakOtp(
     if (typeof status !== "string") {
       throw new SmsProviderError("invalid_response", undefined, undefined, responseDiagnostics);
     }
-    if (status.trim() !== "") {
-      const responseRecId = (body as { recId?: unknown }).recId;
-      const parsedRecId = parseProviderInteger(responseRecId);
-      const error = config.mode !== "shared_template"
-        ? new SmsProviderError("rejected")
-        : parsedRecId !== null
-          ? new SmsProviderError(
-              rejectionCategory(parsedRecId),
-              safeRejectionCode(parsedRecId),
-              parsedRecId > 0
-                ? "status_nonempty_rec_id_positive"
-                : "status_nonempty_rec_id_nonpositive",
-              responseDiagnostics,
-            )
-          : new SmsProviderError(
-              "rejected",
-              undefined,
-              "status_nonempty_rec_id_missing_or_invalid",
-              responseDiagnostics,
-            );
-      logProviderAttempt({ correlationId, outcome: "rejected", startedAt, error, sendingMode });
-      throw error;
-    }
     if (config.mode === "native_otp") {
+      if (status.trim() !== "") {
+        const error = new SmsProviderError("rejected");
+        logProviderAttempt({ correlationId, outcome: "rejected", startedAt, error, sendingMode });
+        throw error;
+      }
       const code = (body as { code?: unknown }).code;
       const nativeCodePattern = new RegExp(
         `^[0-9]{${MIN_NATIVE_OTP_LENGTH},${MAX_NATIVE_OTP_LENGTH}}$`,
@@ -414,23 +483,50 @@ export async function sendMeliPayamakOtp(
     }
 
     const responseRecId = (body as { recId?: unknown }).recId;
-    const recId = parseAcceptedSharedRecId(responseRecId);
-    if (recId === null) {
-      const rejectedRecId = parseProviderInteger(responseRecId);
-      if (rejectedRecId === null) {
-        throw new SmsProviderError("invalid_response", undefined, undefined, responseDiagnostics);
-      }
+    const exactRecId = parseExactSharedRecId(responseRecId, topLevelRecIdSource);
+    // MeliPayamak support identifies a valid positive recId as the shared-send success signal.
+    // Preserve the provider's known positive error sentinel before applying that precedence.
+    if (exactRecId?.kind === "positive" && exactRecId.receipt !== "2") {
+      logProviderAttempt({ correlationId, outcome: "accepted", startedAt, sendingMode });
+      return {
+        verificationCode: locallyGeneratedCode!,
+        recId: exactRecId.receipt,
+        status,
+      };
+    }
+
+    const rejectedRecId = exactRecId?.kind === "positive"
+      ? 2
+      : exactRecId?.kind === "nonpositive"
+        ? exactRecId.numeric
+        : null;
+    if (rejectedRecId !== null) {
       const error = new SmsProviderError(
         rejectionCategory(rejectedRecId),
         safeRejectionCode(rejectedRecId),
-        "status_empty_rec_id_nonpositive",
+        status.trim() === ""
+          ? rejectedRecId === 2
+            ? "status_empty_known_error_rec_id"
+            : "status_empty_rec_id_nonpositive"
+          : rejectedRecId > 0
+            ? "status_nonempty_rec_id_positive"
+            : "status_nonempty_rec_id_nonpositive",
         responseDiagnostics,
       );
       logProviderAttempt({ correlationId, outcome: "rejected", startedAt, error, sendingMode });
       throw error;
     }
-    logProviderAttempt({ correlationId, outcome: "accepted", startedAt, sendingMode });
-    return { verificationCode: locallyGeneratedCode!, recId, status };
+    if (status.trim() !== "") {
+      const error = new SmsProviderError(
+        "rejected",
+        undefined,
+        "status_nonempty_rec_id_missing_or_invalid",
+        responseDiagnostics,
+      );
+      logProviderAttempt({ correlationId, outcome: "rejected", startedAt, error, sendingMode });
+      throw error;
+    }
+    throw new SmsProviderError("invalid_response", undefined, undefined, responseDiagnostics);
   } catch (error) {
     const providerError = error instanceof SmsProviderError
       ? error

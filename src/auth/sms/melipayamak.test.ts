@@ -214,29 +214,22 @@ test("native OTP rejects provider errors and ambiguous or unsafe codes", async (
   }
 });
 
-test("shared-template response accepts documented string and legacy numeric recIds with an empty status", async () => {
-  for (const [providerRecId, expectedRecId] of [
-    ["3741437414", "3741437414"],
-    [3741437414, "3741437414"],
-    ["90071992547409931234", "90071992547409931234"],
+test("shared-template response preserves exact numeric receipts and accepts positive receipt precedence", async () => {
+  for (const [response, expectedRecId] of [
+    [Response.json({ recId: "3741437414", status: "" }), "3741437414"],
+    [Response.json({ recId: 3741437414, status: "" }), "3741437414"],
+    [Response.json({ recId: "90071992547409931234", status: "provider status detail" }), "90071992547409931234"],
+    [new Response('{"recId":90071992547409931234567890,"status":"provider status detail"}'), "90071992547409931234567890"],
+    [new Response(`{"recId":${"9".repeat(64)},"status":""}`), "9".repeat(64)],
   ] as const) {
     const receipt = await sendMeliPayamakOtp(
       "+989121234567",
       "123456",
-      (async () => Response.json({ recId: providerRecId, status: "" })) as typeof fetch,
+      (async () => response) as typeof fetch,
       providerEnvironment,
     );
     assert.equal(receipt.recId, expectedRecId);
   }
-  await assert.rejects(
-    sendMeliPayamakOtp(
-      "+989121234567",
-      "123456",
-      (async () => Response.json({ recId: 1, status: "error description if applicable" })) as typeof fetch,
-      providerEnvironment,
-    ),
-    assertCategory("rejected"),
-  );
   for (const response of [
     new Response("not-json", { status: 200 }),
     Response.json({}),
@@ -245,6 +238,9 @@ test("shared-template response accepts documented string and legacy numeric recI
     Response.json({ recId: "", status: "" }),
     Response.json({ recId: "1.5", status: "" }),
     Response.json({ recId: "accepted", status: "" }),
+    new Response(`{"recId":${"9".repeat(65)},"status":""}`),
+    new Response('{"recId":1.5,"status":""}'),
+    new Response('{"recId":1e400,"status":""}'),
     Response.json({ recId: 1, status: 0 }),
     Response.json([1, ""]),
   ]) {
@@ -286,6 +282,15 @@ test("documented shared-service error recIds are rejected and categorized", asyn
     sendMeliPayamakOtp(
       "+989121234567",
       "123456",
+      (async () => Response.json({ recId: 2, status: "" })) as typeof fetch,
+      providerEnvironment,
+    ),
+    assertCategory("insufficient_credit"),
+  );
+  await assert.rejects(
+    sendMeliPayamakOtp(
+      "+989121234567",
+      "123456",
       (async () => Response.json({ recId: "-4", status: "provider detail" })) as typeof fetch,
       providerEnvironment,
     ),
@@ -299,7 +304,7 @@ test("shared-template rejection logs only bounded response-shape diagnostics", a
   console.error = (value?: unknown) => { entries.push(String(value)); };
   try {
     for (const response of [
-      { recId: "3741437414", status: "raw provider rejection text" },
+      { recId: 2, status: "raw provider rejection text" },
       { recId: -1, status: "another raw rejection" },
       { status: "credential or template detail" },
       { recId: -1, status: "" },
@@ -332,7 +337,6 @@ test("shared-template rejection logs only bounded response-shape diagnostics", a
   );
   const serialized = JSON.stringify(entries);
   for (const sensitive of [
-    "3741437414",
     "raw provider rejection text",
     "another raw rejection",
     "credential or template detail",
@@ -351,11 +355,9 @@ test("failed shared-template responses log only fixed allowlisted shape labels",
   console.error = (value?: unknown) => { entries.push(String(value)); };
   const responses: unknown[] = [
     { status: "secret rejection", code: "secret-code" },
-    { recId: "3741437414", status: "secret rejection" },
     { recId: -1, status: "secret rejection" },
     { recId: 0, status: "secret rejection" },
     { recId: 1.5, status: "secret rejection" },
-    { recId: Number.MAX_SAFE_INTEGER + 1, status: "secret rejection" },
     { recId: "not-a-receipt-secret", status: "secret rejection" },
     { recId: null, status: "secret rejection" },
     { recId: { private: "secret" }, status: "secret rejection" },
@@ -405,11 +407,9 @@ test("failed shared-template responses log only fixed allowlisted shape labels",
       ({ responseEnvelope, recIdPresence, recIdType, recIdShape, statusType, statusShape, codePresent })),
     [
       { responseEnvelope: "top_level_object", recIdPresence: "absent", recIdType: "absent", recIdShape: "not_applicable", statusType: "string", statusShape: "nonempty", codePresent: true },
-      { responseEnvelope: "top_level_object", recIdPresence: "present", recIdType: "string", recIdShape: "positive_decimal", statusType: "string", statusShape: "nonempty", codePresent: false },
       { responseEnvelope: "top_level_object", recIdPresence: "present", recIdType: "number", recIdShape: "negative_decimal", statusType: "string", statusShape: "nonempty", codePresent: false },
       { responseEnvelope: "top_level_object", recIdPresence: "present", recIdType: "number", recIdShape: "zero", statusType: "string", statusShape: "nonempty", codePresent: false },
       { responseEnvelope: "top_level_object", recIdPresence: "present", recIdType: "number", recIdShape: "numeric_fractional", statusType: "string", statusShape: "nonempty", codePresent: false },
-      { responseEnvelope: "top_level_object", recIdPresence: "present", recIdType: "number", recIdShape: "numeric_unsafe_integer", statusType: "string", statusShape: "nonempty", codePresent: false },
       { responseEnvelope: "top_level_object", recIdPresence: "present", recIdType: "string", recIdShape: "malformed", statusType: "string", statusShape: "nonempty", codePresent: false },
       { responseEnvelope: "top_level_object", recIdPresence: "present", recIdType: "null", recIdShape: "not_applicable", statusType: "string", statusShape: "nonempty", codePresent: false },
       { responseEnvelope: "top_level_object", recIdPresence: "present", recIdType: "other", recIdShape: "not_applicable", statusType: "string", statusShape: "nonempty", codePresent: false },
@@ -485,7 +485,9 @@ test("provider operation logs structured metadata but no endpoint, recipient, OT
     await sendMeliPayamakOtp(
       "+989121234567",
       "123456",
-      (async () => Response.json({ recId: 1, status: "" })) as typeof fetch,
+      (async () => new Response(
+        '{"recId":90071992547409931234567890,"status":"private provider status"}',
+      )) as typeof fetch,
       providerEnvironment,
       "00000000-0000-4000-8000-000000000004",
     );
@@ -500,7 +502,16 @@ test("provider operation logs structured metadata but no endpoint, recipient, OT
   assert.equal(serialized.includes("00000000-0000-4000-8000-000000000004"), true);
   assert.equal(serialized.includes("melipayamak"), true);
   assert.equal(serialized.includes("accepted"), true);
-  for (const sensitive of [endpoint, "+989121234567", "09121234567", "123456", "bodyId", "args"]) {
+  for (const sensitive of [
+    endpoint,
+    "+989121234567",
+    "09121234567",
+    "123456",
+    "90071992547409931234567890",
+    "private provider status",
+    "bodyId",
+    "args",
+  ]) {
     assert.equal(serialized.includes(sensitive), false);
   }
 });
@@ -534,6 +545,36 @@ test("native provider logs never contain the returned OTP, endpoint secret, or r
   assert.equal(serialized.includes("native_otp"), true);
   for (const sensitive of ["3741437414", "test-placeholder-secret", nativeEndpoint, "09121234567", "credential rejected detail"]) {
     assert.equal(serialized.includes(sensitive), false);
+  }
+});
+
+test("lossless shared receipt acceptance activates the reserved OTP challenge", async () => {
+  const previousSecret = process.env.AUTH_SECRET;
+  process.env.AUTH_SECRET = "a-development-test-secret-with-32-characters";
+  let activated = false;
+  try {
+    const issued = await issueVerificationChallenge(
+      { type: "mobile", value: "+989121234567" },
+      {
+        reserve: async () => undefined,
+        activate: async () => { activated = true; return true; },
+        invalidate: async () => undefined,
+      },
+      async (identifier, code, context) => sendMeliPayamakOtp(
+        identifier.value,
+        code,
+        (async () => new Response(
+          '{"recId":90071992547409931234567890,"status":"provider informational status"}',
+        )) as typeof fetch,
+        providerEnvironment,
+        context?.correlationId,
+      ),
+    );
+    assert.equal(activated, true);
+    assert.match(issued.challengeId, /^[0-9a-f-]{36}$/i);
+  } finally {
+    if (previousSecret === undefined) delete process.env.AUTH_SECRET;
+    else process.env.AUTH_SECRET = previousSecret;
   }
 });
 
