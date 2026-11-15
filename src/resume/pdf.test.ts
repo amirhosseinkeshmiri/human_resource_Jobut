@@ -103,7 +103,7 @@ test("filename strips traversal, controls, and bidi overrides", () => {
   assert.equal(filename.includes("/"), false);
   assert.equal(filename.includes("\\"), false);
   assert.equal(filename.includes("\u202e"), false);
-  assert.match(buildResumePdfContentDisposition(filename), /filename="jobut-resume\.pdf"/);
+  assert.match(buildResumePdfContentDisposition(filename), /filename="jobokar-resume\.pdf"/);
 });
 
 test("render failures and invalid output fail privately with sanitized diagnostics", async () => {

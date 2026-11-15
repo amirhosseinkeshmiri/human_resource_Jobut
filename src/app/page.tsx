@@ -11,8 +11,8 @@ import {
 } from "@/packages/public-catalog";
 
 export const metadata: Metadata = {
-  title: "شبکه استخدامی متخصصین آکادمیک",
-  description: "شبکه استخدامی متخصصین آکادمیک؛ همراه سازمان‌ها در جذب و استخدام متخصصین دانشگاهی.",
+  title: "جابوکار",
+  description: "جابوکار؛ همراه سازمان‌ها در جذب و استخدام متخصصین دانشگاهی.",
 };
 
 const trustHighlights = [
@@ -26,7 +26,7 @@ const services = [
   {
     number: "۰۱",
     title: "انتشار گسترده آگهی‌های استخدامی",
-    description: "آگهی‌های استخدامی پس از بررسی و تأیید، در کانال‌ها و شبکه‌های اجتماعی شبکه استخدامی متخصصین آکادمیک منتشر می‌شوند تا فرصت‌های شغلی به جامعه‌ای گسترده از متخصصین آکادمیک معرفی شوند.",
+    description: "آگهی‌های استخدامی پس از بررسی و تأیید، در کانال‌ها و شبکه‌های اجتماعی جابوکار منتشر می‌شوند تا فرصت‌های شغلی به جامعه‌ای گسترده از متخصصین آکادمیک معرفی شوند.",
     note: "در صورت نیاز، آگهی پس از بررسی مجدد یک نوبت دیگر منتشر می‌شود.",
     cta: "مشاهده تعرفه‌ها",
     href: "#pricing",
@@ -105,7 +105,7 @@ export default async function Home() {
           <div className="absolute inset-x-0 top-[4%] sm:top-[7%] lg:top-[10%]">
             <Container className="flex justify-center sm:justify-end">
               <div className="max-w-[19rem] rounded-xl border border-white/80 bg-white/90 p-4 text-center shadow-[0_12px_35px_rgb(20_33_145/0.12)] backdrop-blur-sm sm:max-w-md sm:p-6 lg:text-start">
-                <p className="text-xs font-bold tracking-wide text-accent">JOBUT</p>
+                <p className="text-xs font-bold tracking-wide text-accent">JOBOKAR</p>
                 <h1 id="hero-title" className="font-brand mt-2 text-[clamp(1.55rem,3.5vw,3.25rem)] font-bold leading-[1.3] text-action">همراه شما در جذب و استخدام</h1>
                 <div className="mt-4 flex flex-col justify-center gap-2 sm:flex-row lg:justify-start">
                   <Link href="#contact" className={buttonClassNames({ size: "small" })}>درخواست همکاری</Link>
@@ -116,7 +116,7 @@ export default async function Home() {
           </div>
         </section>
 
-        <section aria-label="ارزش‌های شبکه استخدامی متخصصین آکادمیک" className="border-b border-ui-border bg-page">
+        <section aria-label="ارزش‌های جابوکار" className="border-b border-ui-border bg-page">
           <Container className="grid grid-cols-2 gap-px bg-ui-border py-0 lg:grid-cols-4">
             {trustHighlights.map((item) => <p key={item} className="bg-page px-4 py-6 text-center text-sm font-semibold sm:px-6">{item}</p>)}
           </Container>
@@ -127,7 +127,7 @@ export default async function Home() {
             <div className="max-w-3xl">
               <p className="text-meta text-accent">راهکارهای تخصصی جذب و توسعه سرمایه انسانی</p>
               <h2 id="services-title" className="text-section-title mt-2">خدمات ما</h2>
-              <p className="text-secondary mt-3">شبکه استخدامی متخصصین آکادمیک با تمرکز بر نیازهای واقعی سازمان‌ها، خدمات تخصصی جذب، شناسایی و توسعه سرمایه‌های انسانی را ارائه می‌کند.</p>
+              <p className="text-secondary mt-3">جابوکار با تمرکز بر نیازهای واقعی سازمان‌ها، خدمات تخصصی جذب، شناسایی و توسعه سرمایه‌های انسانی را ارائه می‌کند.</p>
             </div>
             <div className="mt-8 grid gap-4 md:grid-cols-2">
               {services.map((service) => (
@@ -146,11 +146,11 @@ export default async function Home() {
           </Container>
         </section>
 
-        <section id="why-jobut" aria-labelledby="why-jobut-title" className="scroll-mt-32 border-y border-ui-border bg-surface">
+        <section id="why-jobokar" aria-labelledby="why-jobokar-title" className="scroll-mt-32 border-y border-ui-border bg-surface">
           <Container className="py-[var(--section-spacing)]">
             <div className="max-w-3xl">
-              <p className="text-meta text-accent">مزیت همکاری با شبکه استخدامی متخصصین آکادمیک</p>
-              <h2 id="why-jobut-title" className="text-section-title mt-2">چرا شبکه استخدامی متخصصین آکادمیک؟</h2>
+              <p className="text-meta text-accent">مزیت همکاری با جابوکار</p>
+              <h2 id="why-jobokar-title" className="text-section-title mt-2">چرا جابوکار؟</h2>
               <p className="text-secondary mt-3">ترکیبی از شبکه تخصصی، شناخت بازار کار و همراهی حرفه‌ای در فرآیند جذب و توسعه مسیر شغلی.</p>
             </div>
             <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -168,12 +168,12 @@ export default async function Home() {
         <section id="about" aria-labelledby="about-title" className="scroll-mt-32">
           <Container className="grid gap-10 py-[var(--section-spacing)] lg:grid-cols-[minmax(0,1.3fr)_minmax(18rem,0.7fr)] lg:items-start">
             <div>
-              <p className="text-meta text-accent">شبکه استخدامی متخصصین آکادمیک</p>
-              <h2 id="about-title" className="text-section-title mt-2">درباره شبکه استخدامی متخصصین آکادمیک</h2>
+              <p className="text-meta text-accent">جابوکار</p>
+              <h2 id="about-title" className="text-section-title mt-2">درباره جابوکار</h2>
               <div className="mt-5 grid gap-4 text-secondary">
-                <p>شبکه استخدامی متخصصین آکادمیک در سال ۱۳۹۵ توسط جمعی از دانشجویان دانشگاه تهران، با هدف تسهیل دسترسی کارفرمایان و کارجویان به فرصت‌های بهتر تأسیس شد.</p>
-                <p>امروز شبکه استخدامی متخصصین آکادمیک با جامعه‌ای بیش از ۱۲۵ هزار نفر از فارغ‌التحصیلان و متخصصین دانشگاهی ایران، بستری برای دسترسی سازمان‌ها به نیروهای متخصص، توانمند و بااستعداد فراهم کرده است.</p>
-                <p>تمرکز شبکه استخدامی متخصصین آکادمیک بر شناسایی و معرفی سرمایه‌های انسانی مناسب، به شرکت‌ها کمک می‌کند فرآیند جذب خود را سریع‌تر و مؤثرتر پیش ببرند و با استفاده از ظرفیت متخصصین آکادمیک، توانمندی سازمان خود را توسعه دهند.</p>
+                <p>فعالیت این مجموعه در سال ۱۳۹۵ با هدف تسهیل دسترسی کارفرمایان و کارجویان به فرصت‌های بهتر آغاز شد.</p>
+                <p>امروز جابوکار با جامعه‌ای بیش از ۱۲۵ هزار نفر از فارغ‌التحصیلان و متخصصین دانشگاهی ایران، بستری برای دسترسی سازمان‌ها به نیروهای متخصص، توانمند و بااستعداد فراهم کرده است.</p>
+                <p>تمرکز جابوکار بر شناسایی و معرفی سرمایه‌های انسانی مناسب، به شرکت‌ها کمک می‌کند فرآیند جذب خود را سریع‌تر و مؤثرتر پیش ببرند و با استفاده از ظرفیت متخصصین آکادمیک، توانمندی سازمان خود را توسعه دهند.</p>
               </div>
             </div>
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-1">
@@ -186,9 +186,9 @@ export default async function Home() {
         <section aria-labelledby="mission-title" className="border-y border-ui-border bg-surface">
           <Container className="py-[var(--section-spacing)]">
             <div className="mx-auto max-w-4xl text-center">
-              <p className="text-meta text-accent">ماموریت شبکه استخدامی متخصصین آکادمیک</p>
+              <p className="text-meta text-accent">ماموریت جابوکار</p>
               <h2 id="mission-title" className="text-section-title mt-2">برای ساختن آینده بهتر</h2>
-              <p className="text-body mt-5 text-text-secondary">شبکه استخدامی متخصصین آکادمیک می‌کوشد با همراهی مدیران کسب‌وکار، صاحبان صنایع و خبرگان دانشگاهی، بستری برای شناسایی و جذب استعدادهای توانمند، ارتقای سرمایه انسانی و توسعه پایدار کسب‌وکارها و صنعت ایران فراهم کند.</p>
+              <p className="text-body mt-5 text-text-secondary">جابوکار می‌کوشد با همراهی مدیران کسب‌وکار، صاحبان صنایع و خبرگان دانشگاهی، بستری برای شناسایی و جذب استعدادهای توانمند، ارتقای سرمایه انسانی و توسعه پایدار کسب‌وکارها و صنعت ایران فراهم کند.</p>
             </div>
           </Container>
         </section>
@@ -197,8 +197,8 @@ export default async function Home() {
           <Container className="py-[var(--section-spacing)]">
             <div className="max-w-3xl">
               <p className="text-meta text-accent">عملکرد شبکه</p>
-              <h2 id="performance-title" className="text-section-title mt-2">شبکه استخدامی متخصصین آکادمیک در یک نگاه</h2>
-              <p className="text-secondary mt-3">نگاهی به بخشی از عملکرد شبکه استخدامی متخصصین آکادمیک</p>
+              <h2 id="performance-title" className="text-section-title mt-2">جابوکار در یک نگاه</h2>
+              <p className="text-secondary mt-3">نگاهی به بخشی از عملکرد جابوکار</p>
             </div>
             <div className="mt-8 grid grid-cols-2 gap-4 lg:grid-cols-4">
               {performance.map((item) => (
@@ -217,7 +217,7 @@ export default async function Home() {
             <div className="max-w-3xl">
               <p className="text-meta text-accent">تعرفه خدمات</p>
               <h2 id="pricing-title" className="text-section-title mt-2">تعرفه‌ها</h2>
-              <p className="text-secondary mt-3">راهکار متناسب با نیاز سازمان خود را انتخاب کنید و برای شروع همکاری با شبکه استخدامی متخصصین آکادمیک درخواست خود را ثبت کنید.</p>
+              <p className="text-secondary mt-3">راهکار متناسب با نیاز سازمان خود را انتخاب کنید و برای شروع همکاری با جابوکار درخواست خود را ثبت کنید.</p>
             </div>
 
             <div aria-label="دسته‌بندی خدمات" className="mt-7 flex flex-wrap gap-2">
@@ -227,7 +227,7 @@ export default async function Home() {
 
             <Card className="mt-6 shadow-none">
               <h3 className="text-card-title">انتشار گسترده آگهی‌های استخدامی</h3>
-              <p className="text-secondary mt-3">انتشار آگهی در کانال‌های شبکه استخدامی متخصصین آکادمیک. هر آگهی پس از تأیید، ابتدا در شبکه‌های اجتماعی منتشر می‌شود و سپس در پایان هفته در فهرست آگهی‌ها قرار می‌گیرد. در صورتی که رزومه کافی جذب نشود، پس از بررسی مجدد آگهی و اعمال تغییرات، یک نوبت دیگر منتشر خواهد شد.</p>
+              <p className="text-secondary mt-3">انتشار آگهی در کانال‌های جابوکار. هر آگهی پس از تأیید، ابتدا در شبکه‌های اجتماعی منتشر می‌شود و سپس در پایان هفته در فهرست آگهی‌ها قرار می‌گیرد. در صورتی که رزومه کافی جذب نشود، پس از بررسی مجدد آگهی و اعمال تغییرات، یک نوبت دیگر منتشر خواهد شد.</p>
               <p className="text-label mt-4">پرداخت آنلاین فقط برای بسته‌های دارای دکمه ثبت سفارش و به‌صورت تسویه کامل انجام می‌شود؛ موارد نیازمند هماهنگی به درگاه هدایت نمی‌شوند.</p>
             </Card>
 
@@ -286,7 +286,7 @@ export default async function Home() {
               <div className="max-w-3xl">
                 <p className="text-sm text-white/75">همراه سازمان شما</p>
                 <h2 id="final-cta-title" className="text-section-title mt-2 text-white">برای جذب بهترین استعدادها آماده‌اید؟</h2>
-                <p className="mt-3 text-sm leading-7 text-white/85">شبکه استخدامی متخصصین آکادمیک، همراه شما برای دسترسی به شبکه‌ای از متخصصین آکادمیک ایران و ساختن یک فرآیند جذب حرفه‌ای‌تر.</p>
+                <p className="mt-3 text-sm leading-7 text-white/85">جابوکار، همراه شما برای دسترسی به شبکه‌ای از متخصصین آکادمیک ایران و ساختن یک فرآیند جذب حرفه‌ای‌تر.</p>
               </div>
               <div className="mt-7 flex shrink-0 flex-col gap-3 sm:flex-row lg:mt-0">
                 <Link href="#contact" className={buttonClassNames({ variant: "secondary", size: "large", className: "border-white bg-white" })}>شروع همکاری</Link>

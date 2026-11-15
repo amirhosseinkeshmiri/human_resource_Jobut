@@ -1,13 +1,28 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
+import { BRAND_DESCRIPTION_FA, BRAND_NAME_EN, BRAND_NAME_FA, getPublicOrigin } from "@/brand/identity";
 import "./globals.css";
 
 export const metadata: Metadata = {
+  metadataBase: new URL(getPublicOrigin()),
+  applicationName: BRAND_NAME_EN,
   title: {
-    default: "شبکه استخدامی متخصصین آکادمیک",
-    template: "%s | شبکه استخدامی متخصصین آکادمیک",
+    default: BRAND_NAME_FA,
+    template: `%s | ${BRAND_NAME_FA}`,
   },
-  description: "شبکه استخدامی متخصصین آکادمیک؛ همراه شما در جذب و استخدام.",
+  description: BRAND_DESCRIPTION_FA,
+  openGraph: {
+    type: "website",
+    siteName: BRAND_NAME_FA,
+    title: BRAND_NAME_FA,
+    description: BRAND_DESCRIPTION_FA,
+  },
+  twitter: {
+    card: "summary",
+    title: BRAND_NAME_FA,
+    description: BRAND_DESCRIPTION_FA,
+  },
+  manifest: "/manifest.webmanifest",
 };
 
 export default function RootLayout({ children }: Readonly<{ children: ReactNode }>) {

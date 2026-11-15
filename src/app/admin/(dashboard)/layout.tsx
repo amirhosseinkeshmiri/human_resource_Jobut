@@ -31,8 +31,8 @@ export default async function AdminLayout({ children }: AdminLayoutProps) {
     <div className="min-h-screen bg-page lg:grid lg:grid-cols-[14rem_minmax(0,1fr)]">
       <aside className="hidden bg-action text-white lg:sticky lg:top-0 lg:flex lg:h-screen lg:flex-col">
         <div className="border-b border-white/10 p-5">
-          <p className="text-xs text-white/60">JOBUT</p>
-          <p className="mt-1 font-bold">مدیریت شبکه استخدامی متخصصین آکادمیک</p>
+          <p className="text-xs text-white/60">JOBOKAR</p>
+          <p className="mt-1 font-bold">مدیریت جابوکار</p>
         </div>
         <nav aria-label="ناوبری مدیریت" className="grid gap-1 p-3">
           {navigation.map((item) => <Link key={item.href} href={item.href} className="rounded-md px-3 py-2.5 text-sm font-semibold text-white/75 outline-none hover:bg-white/10 hover:text-white focus-visible:ring-2 focus-visible:ring-white/60">{item.label}</Link>)}
@@ -47,7 +47,7 @@ export default async function AdminLayout({ children }: AdminLayoutProps) {
       <div className="min-w-0">
         <header className="border-b border-ui-border bg-surface lg:hidden">
           <Container width="dashboard" className="flex min-h-16 items-center justify-between gap-3">
-            <div><p className="text-meta">JOBUT</p><p className="text-sm font-bold">مدیریت شبکه استخدامی متخصصین آکادمیک</p></div>
+            <div><p className="text-meta">JOBOKAR</p><p className="text-sm font-bold">مدیریت جابوکار</p></div>
             <form action={logoutAdmin}><Button type="submit" variant="ghost" size="small">خروج</Button></form>
           </Container>
           <Container width="dashboard" as="nav" aria-label="ناوبری مدیریت موبایل" className="flex gap-2 overflow-x-auto border-t py-2">

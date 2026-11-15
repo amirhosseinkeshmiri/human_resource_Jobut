@@ -11,7 +11,7 @@ export async function PublicHeader() {
       <Container className="relative flex h-[4.5rem] items-center gap-5">
         <Link
           href="/"
-          aria-label="صفحه اصلی شبکه استخدامی متخصصین آکادمیک"
+          aria-label="صفحه اصلی جابوکار"
           className="shrink-0 rounded-md outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2"
         >
           <BrandLogo priority className="w-[4.5rem] sm:w-20" />

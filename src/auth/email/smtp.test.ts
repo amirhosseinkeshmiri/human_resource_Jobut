@@ -10,7 +10,7 @@ const environment = {
   SMTP_PASS: "secret-not-logged",
   SMTP_TIMEOUT_MS: "5000",
   EMAIL_FROM: "no-reply@jobut.ir",
-  EMAIL_FROM_NAME: "JobUT",
+  EMAIL_FROM_NAME: "Jobokar",
 } as unknown as NodeJS.ProcessEnv;
 
 test("SMTP configuration requires bounded TLS-compatible values and paired credentials", () => {
@@ -24,6 +24,9 @@ test("SMTP configuration requires bounded TLS-compatible values and paired crede
 
 test("OTP template contains equivalent safe HTML and plain text", () => {
   const message = buildOtpEmail("012345");
+  assert.equal(message.subject, "کد ورود به جابوکار");
+  assert.match(message.text, /جابوکار/);
+  assert.match(message.html, /جابوکار/);
   assert.match(message.text, /012345/);
   assert.match(message.html, /dir="rtl"/);
   assert.match(message.html, /012345/);

@@ -1,4 +1,4 @@
-# استقرار Jobut روی Runflare
+# استقرار Jobokar روی Runflare
 
 تنظیمات سرویس متصل به GitHub باید به‌صورت زیر باشد:
 

@@ -1,4 +1,3 @@
-import Image from "next/image";
 import { classNames } from "@/lib/class-names";
 
 interface BrandLogoProps {
@@ -8,13 +7,16 @@ interface BrandLogoProps {
 
 export function BrandLogo({ className, priority = false }: BrandLogoProps) {
   return (
-    <Image
-      src="/brand/main_logo.png"
-      alt="شبکه استخدامی متخصصین آکادمیک"
-      width={1448}
-      height={1086}
-      priority={priority}
-      className={classNames("h-auto w-28 object-contain", className)}
-    />
+    <span
+      aria-label="جابوکار"
+      data-priority={priority || undefined}
+      className={classNames(
+        "inline-flex w-fit flex-col items-center text-center leading-none text-action",
+        className,
+      )}
+    >
+      <span className="font-brand text-2xl font-black">جابوکار</span>
+      <span className="mt-1 text-[0.62rem] font-bold tracking-[0.18em]" dir="ltr">JOBOKAR</span>
+    </span>
   );
 }

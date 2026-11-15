@@ -1,7 +1,7 @@
 # تصویر پروفایل کارجو
 
 این قابلیت به‌صورت پیش‌فرض غیرفعال است و تصویر را به شکل WebP بدون metadata در زیرشاخه
-`candidate-profile-photos` از مسیر `UPLOAD_STORAGE_DIR` نگه می‌دارد. در تولید JobUT مسیر کامل
+`candidate-profile-photos` از مسیر `UPLOAD_STORAGE_DIR` نگه می‌دارد. در تولید Jobokar مسیر کامل
 `/app/uploads/candidate-profile-photos` خواهد بود؛ مسیر مطلق در دیتابیس ذخیره نمی‌شود.
 
 ## فعال‌سازی امن

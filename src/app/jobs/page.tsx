@@ -32,7 +32,7 @@ export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: PUBLIC_JOBS_LABEL,
-  description: "فرصت‌های شغلی فعال در شبکه استخدامی متخصصین آکادمیک.",
+  description: "فرصت‌های شغلی فعال در جابوکار.",
 };
 
 interface PageProps {
@@ -56,7 +56,7 @@ export default async function PublicJobsPage({ searchParams }: PageProps) {
       <main>
         <section className="border-b border-ui-border bg-surface">
           <Container className="py-12 sm:py-16">
-            <p className="text-meta text-accent">شبکه استخدامی متخصصین آکادمیک</p>
+            <p className="text-meta text-accent">جابوکار</p>
             <h1 className="text-page-title mt-2">{PUBLIC_JOBS_LABEL}</h1>
             <p className="text-secondary mt-3 max-w-2xl">فرصت‌های شغلی فعال را بر اساس عنوان، شرکت، شهر و شرایط همکاری پیدا کنید.</p>
           </Container>

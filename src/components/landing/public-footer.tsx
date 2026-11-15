@@ -21,7 +21,7 @@ export function PublicFooter() {
       <Container className="grid gap-10 py-12 sm:grid-cols-2 lg:grid-cols-[1.15fr_0.75fr_1fr_1.1fr]">
         <div>
           <BrandLogo className="w-32" />
-          <p className="text-label mt-3">شبکه استخدامی متخصصین آکادمیک</p>
+          <p className="text-label mt-3">جابوکار</p>
           <p className="text-secondary mt-2">همراه شما در جذب و استخدام</p>
         </div>
 
@@ -35,7 +35,7 @@ export function PublicFooter() {
         </nav>
 
         <div>
-          <h2 className="text-label">ارتباط با شبکه استخدامی متخصصین آکادمیک</h2>
+          <h2 className="text-label">ارتباط با جابوکار</h2>
           <div className="mt-4 grid gap-2.5 text-sm">
             <a href="https://www.jobut.ir" className="text-text-secondary outline-none hover:text-text-primary focus-visible:rounded focus-visible:ring-2 focus-visible:ring-focus/30" dir="ltr">www.jobut.ir</a>
             <a href="tel:09334414351" className="text-text-secondary outline-none hover:text-text-primary focus-visible:rounded focus-visible:ring-2 focus-visible:ring-focus/30" dir="ltr">09334414351</a>
@@ -57,7 +57,7 @@ export function PublicFooter() {
         </address>
       </Container>
       <div className="border-t border-ui-border">
-        <Container className="py-5 text-center text-xs text-text-muted">JOBUT · شبکه استخدامی متخصصین آکادمیک</Container>
+        <Container className="py-5 text-center text-xs text-text-muted">JOBOKAR · جابوکار</Container>
       </div>
     </footer>
   );

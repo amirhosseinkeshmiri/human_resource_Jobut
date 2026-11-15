@@ -113,7 +113,7 @@ export default async function PublicJobPage({ params, searchParams }: PublicJobP
                 {applicationEligibility === "login-required" ? <><p className="text-secondary mt-2">برای ارسال رزومه وارد حساب کارجو شوید.</p><Link href="/login/candidate" className={buttonClassNames({ className: "mt-4 w-full" })}>ورود به حساب کارجو</Link></> : null}
                 {applicationEligibility === "resume-required" ? <><p className="text-secondary mt-2">برای ارسال درخواست ابتدا رزومه خود را تکمیل کنید.</p><Link href="/candidate/resume" className={buttonClassNames({ className: "mt-4 w-full" })}>تکمیل رزومه</Link></> : null}
                 {applicationEligibility === "already-applied" ? <><p className="mt-2 font-semibold text-success">درخواست شما ارسال شده است.</p><Link href="/candidate/applications" className={buttonClassNames({ variant: "secondary", className: "mt-4 w-full" })}>مشاهده درخواست‌های من</Link></> : null}
-                {applicationEligibility === "eligible" ? <><p className="text-secondary mt-2">رزومه فعلی شما در شبکه استخدامی متخصصین آکادمیک برای این فرصت ارسال می‌شود.</p><ApplicationSubmitForm action={applyToJob} jobPostId={job.id} /></> : null}
+                {applicationEligibility === "eligible" ? <><p className="text-secondary mt-2">رزومه فعلی شما در جابوکار برای این فرصت ارسال می‌شود.</p><ApplicationSubmitForm action={applyToJob} jobPostId={job.id} /></> : null}
                 {applicationEligibility === "job-unavailable" ? <p className="text-secondary mt-2">این آگهی دیگر فعال نیست.</p> : null}
               </Card>
 

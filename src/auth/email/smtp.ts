@@ -60,7 +60,7 @@ export function readSmtpConfiguration(environment: NodeJS.ProcessEnv = process.e
     throw new Error("email_configuration_timeout");
   }
 
-  const fromName = (environment.EMAIL_FROM_NAME?.trim() || "JobUT").slice(0, 80);
+  const fromName = (environment.EMAIL_FROM_NAME?.trim() || "Jobokar").slice(0, 80);
   if (/\r|\n/.test(fromName)) throw new Error("email_configuration_from_name");
 
   return { host, port, secure: secureValue === "true", user, pass, from, fromName, timeoutMs };
@@ -80,9 +80,9 @@ export function buildOtpEmail(verificationCode: string) {
   if (!/^\d{6}$/.test(verificationCode)) throw new Error("email_invalid_otp");
   const code = escapeHtml(verificationCode);
   return {
-    subject: "کد ورود به JobUT",
-    text: `کد ورود شما به JobUT: ${verificationCode}\nاین کد ۱۰ دقیقه اعتبار دارد. اگر این درخواست از طرف شما نبوده است، این پیام را نادیده بگیرید.`,
-    html: `<div dir="rtl" lang="fa"><p>کد ورود شما به JobUT:</p><p style="font-size:24px;font-weight:700;letter-spacing:4px">${code}</p><p>این کد ۱۰ دقیقه اعتبار دارد. اگر این درخواست از طرف شما نبوده است، این پیام را نادیده بگیرید.</p></div>`,
+    subject: "کد ورود به جابوکار",
+    text: `کد ورود شما به جابوکار: ${verificationCode}\nاین کد ۱۰ دقیقه اعتبار دارد. اگر این درخواست از طرف شما نبوده است، این پیام را نادیده بگیرید.`,
+    html: `<div dir="rtl" lang="fa"><p>کد ورود شما به جابوکار:</p><p style="font-size:24px;font-weight:700;letter-spacing:4px">${code}</p><p>این کد ۱۰ دقیقه اعتبار دارد. اگر این درخواست از طرف شما نبوده است، این پیام را نادیده بگیرید.</p></div>`,
   };
 }
 

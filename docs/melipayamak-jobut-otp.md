@@ -1,16 +1,16 @@
-# پیامک OTP اختصاصی Jobut
+# پیامک OTP اختصاصی Jobokar
 
-در production، ورود موبایلی Employer، Candidate و Adminهای از قبل ایجادشده می‌تواند از API بومی OTP یا API قالب اشتراکی MeliPayamak استفاده کند. حالت production جدید JobUT برابر `native_otp` است. endpoint شامل credential محرمانه در path است و نباید در کد، مرورگر، پاسخ خطا یا لاگ قرار بگیرد.
+در production، ورود موبایلی Employer، Candidate و Adminهای از قبل ایجادشده می‌تواند از API بومی OTP یا API قالب اشتراکی MeliPayamak استفاده کند. حالت production جدید Jobokar برابر `native_otp` است. endpoint شامل credential محرمانه در path است و نباید در کد، مرورگر، پاسخ خطا یا لاگ قرار بگیرد.
 
 ## قرارداد
 
 - native OTP: درخواست `POST` به endpoint محرمانه `/api/send/otp/...` با JSON دقیق `{ "to": "09123456789" }` است. پاسخ موفق باید HTTP موفق و JSON با `status` خالی و `code` رشته عددی معتبر داشته باشد.
-- `code` را provider تولید می‌کند. JobUT آن را فقط در حافظه دریافت و بلافاصله HMAC می‌کند؛ مقدار plaintext persist، log یا به client برگردانده نمی‌شود.
-- مستند پنل طول دقیق `code` را تعیین نکرده و مثال ده‌رقمی صرفاً مثال است. سیاست امنیتی JobUT فعلاً فقط ASCII digit با طول ۶ تا ۳۲ را می‌پذیرد؛ مقدار خارج این بازه fail-closed است.
+- `code` را provider تولید می‌کند. Jobokar آن را فقط در حافظه دریافت و بلافاصله HMAC می‌کند؛ مقدار plaintext persist، log یا به client برگردانده نمی‌شود.
+- مستند پنل طول دقیق `code` را تعیین نکرده و مثال ده‌رقمی صرفاً مثال است. سیاست امنیتی Jobokar فعلاً فقط ASCII digit با طول ۶ تا ۳۲ را می‌پذیرد؛ مقدار خارج این بازه fail-closed است.
 - shared template سازگار قبلی: درخواست `{ "bodyId": 561397, "to": "09123456789", "args": ["123456"] }` و پاسخ پذیرفته‌شده دارای `recId` دهدهی مثبت (نوع رشته در مستند رسمی و نوع عدد برای سازگاری) و `status` خالی است.
 - در هر دو حالت، HTTP 200 به‌تنهایی موفقیت نیست و `status` غیرخالی رد provider است. پذیرش API نیز به معنی تحویل قطعی به گوشی نیست.
 
-کد شش‌رقمی را Jobut با random cryptographic تولید می‌کند. Jobut ابتدا challenge منقضی و غیرقابل‌استفاده رزرو می‌کند، OTP خام را فقط به‌عنوان آرگومان قالب در درخواست شبکه می‌فرستد و پس از پاسخ معتبر provider فقط HMAC کد را در مرحله فعال‌سازی ذخیره می‌کند. OTP خام نه persist و نه log می‌شود.
+کد شش‌رقمی را Jobokar با random cryptographic تولید می‌کند. Jobokar ابتدا challenge منقضی و غیرقابل‌استفاده رزرو می‌کند، OTP خام را فقط به‌عنوان آرگومان قالب در درخواست شبکه می‌فرستد و پس از پاسخ معتبر provider فقط HMAC کد را در مرحله فعال‌سازی ذخیره می‌کند. OTP خام نه persist و نه log می‌شود.
 
 ## متغیرهای production
 

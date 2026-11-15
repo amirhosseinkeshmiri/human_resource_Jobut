@@ -154,8 +154,8 @@ export function buildResumePdfDocument(resume: ResumePdfData): DocumentNode {
     props: {
       title: `رزومه ${resume.firstName} ${resume.lastName}`,
       author: `${resume.firstName} ${resume.lastName}`,
-      creator: "JobUT",
-      producer: "JobUT",
+      creator: "Jobokar",
+      producer: "Jobokar",
       language: "fa-IR",
     },
     children: [{
@@ -169,7 +169,7 @@ export function buildResumePdfDocument(resume: ResumePdfData): DocumentNode {
           text(`محل سکونت: ${resume.city}`, styles.city),
         ], styles.header),
         ...sections,
-        text("رزومه ساخته‌شده در JobUT", styles.footer, { fixed: true }),
+        text("رزومه ساخته‌شده در جابوکار", styles.footer, { fixed: true }),
       ],
     }],
   } as DocumentNode;
@@ -186,8 +186,8 @@ export async function renderResumePdf(resume: ResumePdfData) {
     info: {
       Title: document.props.title,
       Author: document.props.author,
-      Creator: "JobUT",
-      Producer: "JobUT",
+      Creator: "Jobokar",
+      Producer: "Jobokar",
       CreationDate: new Date(),
     },
   });

@@ -1,4 +1,4 @@
-# ایمیل تراکنشی JobUT
+# ایمیل تراکنشی Jobokar
 
 ## دامنه پیاده‌سازی‌شده
 
@@ -18,7 +18,7 @@ challenge، cooldown، rate limit، expiry و single-use موجود و از طر
 
 - `EMAIL_PROVIDER=smtp`
 - `EMAIL_FROM`: آدرس ساده و تأییدشده، مانند `no-reply@jobut.ir`
-- `EMAIL_FROM_NAME=JobUT`
+- `EMAIL_FROM_NAME=Jobokar`
 - `SMTP_HOST`: hostname بدون scheme یا port
 - `SMTP_PORT`: معمولاً `465` برای TLS مستقیم یا `587` برای STARTTLS
 - `SMTP_SECURE=true` برای TLS مستقیم و `false` برای STARTTLS اجباری

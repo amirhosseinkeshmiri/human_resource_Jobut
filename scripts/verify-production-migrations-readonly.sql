@@ -1,4 +1,4 @@
--- JobUT production migration readiness (READ ONLY)
+-- Jobokar production migration readiness (READ ONLY)
 -- Run the complete script in Runflare pgAdmin Query Tool. It reads catalogs and
 -- the Drizzle journal only; it does not inspect application rows.
 BEGIN TRANSACTION READ ONLY;

@@ -1,6 +1,6 @@
-# Jobut
+# Jobokar
 
-Employer-side foundation for Jobut, built with Next.js, TypeScript, Tailwind CSS,
+Employer-side foundation for Jobokar, built with Next.js, TypeScript, Tailwind CSS,
 PostgreSQL, and Drizzle ORM.
 
 ## Setup
@@ -28,6 +28,8 @@ use a dedicated temporary directory for local tests).
 
 Runflare build and runtime settings are documented in
 [`docs/runflare-deployment.md`](docs/runflare-deployment.md).
+The future `jobokar.com` cutover is intentionally deferred and documented in
+[`docs/jobokar-domain-cutover.md`](docs/jobokar-domain-cutover.md).
 
 ```bash
 npm run db:generate  # generate SQL migrations from the schema

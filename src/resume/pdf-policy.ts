@@ -60,12 +60,12 @@ export function buildResumePdfFilename(firstName: string, lastName: string) {
     .replace(/\s+/g, " ")
     .trim()
     .slice(0, 80);
-  return candidateName ? `رزومه-${candidateName}-JobUT.pdf` : "resume-JobUT.pdf";
+  return candidateName ? `رزومه-${candidateName}-Jobokar.pdf` : "resume-Jobokar.pdf";
 }
 
 export function buildResumePdfContentDisposition(filename: string) {
   const encoded = encodeURIComponent(filename).replace(/[!'()*]/g, (character) => `%${character.charCodeAt(0).toString(16).toUpperCase()}`);
-  return `attachment; filename="jobut-resume.pdf"; filename*=UTF-8''${encoded}`;
+  return `attachment; filename="jobokar-resume.pdf"; filename*=UTF-8''${encoded}`;
 }
 
 export function resumePdfResponseHeaders(filename: string, byteLength: number) {

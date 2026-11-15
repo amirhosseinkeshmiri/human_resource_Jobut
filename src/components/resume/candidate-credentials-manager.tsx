@@ -107,7 +107,7 @@ export function CandidateCredentialsManager({ initialRecords }: { initialRecords
   return <section className="mt-6 grid gap-6" aria-labelledby="candidate-credentials-heading">
     <Card className="shadow-none">
       <h2 id="candidate-credentials-heading" className="text-section-title">گواهی‌ها و دوره‌های آموزشی</h2>
-      <p className="text-helper mt-2">تحصیلات رسمی در بخش تحصیلات باقی می‌ماند. این بخش برای دوره‌ها و گواهی‌های حرفه‌ای است و ثبت آن به معنی تأیید مستقل JobUT نیست.</p>
+      <p className="text-helper mt-2">تحصیلات رسمی در بخش تحصیلات باقی می‌ماند. این بخش برای دوره‌ها و گواهی‌های حرفه‌ای است و ثبت آن به معنی تأیید مستقل Jobokar نیست.</p>
       {message ? <p role={message.type === "error" ? "alert" : "status"} className={`mt-4 rounded-md border p-3 text-sm font-semibold ${message.type === "error" ? "border-danger/30 bg-danger/5 text-danger" : "border-success/30 bg-success/5 text-success"}`}>{message.text}</p> : null}
       <form onSubmit={save} className="mt-5 grid gap-4" noValidate>
         <div className="grid gap-4 sm:grid-cols-2">

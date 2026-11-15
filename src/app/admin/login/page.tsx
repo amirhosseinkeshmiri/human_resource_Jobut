@@ -17,7 +17,7 @@ export default async function AdminLoginPage() {
         <Card className="mx-auto max-w-md border-t-4 border-t-action">
           <BrandLogo className="mx-auto mb-6 w-24" />
           <div className="mb-7">
-            <p className="text-meta">JOBUT Admin</p>
+            <p className="text-meta">JOBOKAR Admin</p>
             <h1 className="text-section-title mt-2">ورود به مدیریت</h1>
             <p className="text-secondary mt-2">ورود فقط برای حساب‌های مدیریتی از پیش تعریف‌شده امکان‌پذیر است.</p>
           </div>
